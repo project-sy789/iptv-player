@@ -32,6 +32,18 @@
   --radius-sm: 8px;
   --sidebar-w: 240px;
 }
+/* Light theme (auto-detect from system) */
+@media (prefers-color-scheme: light){
+  :root{--bg:#f5f5f7;--surface:#fff;--surface2:#eee;--border:#ddd;--text:#1a1a2e;--dim:#666}
+  #player-bar{background:var(--surface);border-top-color:var(--border)}
+  #topbar{background:var(--surface);border-bottom-color:var(--border)}
+  #sidebar{background:var(--surface);border-right-color:var(--border)}
+  .row-scroll .card:hover{box-shadow:0 8px 25px rgba(0,0,0,.15)}
+  .country-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.1)}
+  #player-overlay .topbar{background:rgba(0,0,0,.85)}
+  video::cue{background:rgba(0,0,0,.85)}
+}
+
 *{margin:0;padding:0;box-sizing:border-box}
 body{
   font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
@@ -360,6 +372,13 @@ body{
 #overlayAudio{max-width:60px!important;font-size:10px!important}
 #ccBtn.on,#overlayCcBtn.on{background:var(--live)!important;color:#000!important}
 
+
+/* Heart / Favorite */
+.heart-btn{background:transparent;border:none;cursor:pointer;font-size:18px;padding:2px 6px;transition:transform .15s;color:var(--dim);outline:none}
+.heart-btn:hover{transform:scale(1.3)}
+.heart-btn.on{color:#ef4444}
+.heart-btn:focus-visible{outline:2px solid var(--accent);border-radius:4px}
+
 /* Fullscreen player */
 #player-overlay{
   position:fixed;inset:0;background:#000;z-index:200;
@@ -568,6 +587,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     </div>
     <button onclick="refreshData()" title="Refresh from iptv-org" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:7px 14px;border-radius:6px;cursor:pointer;font-size:12px;margin-left:8px" id="refreshBtn">🔄 รีเฟรช</button>
     <button onclick="testVisibleChannels()" title="Test stream signals" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:7px 12px;border-radius:6px;cursor:pointer;font-size:12px" id="testBtn">📶 ทดสอบ</button>
+    <span id="themeToggle" style="cursor:pointer;font-size:14px;color:var(--dim);margin:0 4px;user-select:none" onclick="toggleTheme()" title="Light/Dark">🌓</span>
     <span id="langToggle" style="cursor:pointer;font-size:12px;color:var(--dim);margin:0 4px;user-select:none" onclick="setLang(LANG==='th'?'en':'th')">TH | EN</span>
     <button onclick="doLogout()" id="logout-btn">🚪 ออกจากระบบ</button>
   </div>
@@ -577,10 +597,12 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
 </div>
 
 <div id="player-bar">
+  <button class="heart-btn" id="barHeart" onclick="toggleFav()" title="❤️ Favorite" tabindex="0" onkeydown="if(event.key==='Enter')toggleFav()" style="font-size:20px;background:transparent;border:none;cursor:pointer;padding:0 4px">🤍</button>
   <div class="thumb" id="barThumb">📺</div>
   <div class="info">
     <div class="nm" id="barName">—</div>
     <div class="sub" id="barSub">—</div>
+    <div class="epg" id="barEpg" style="display:none;font-size:10px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
   </div>
   <select id="qualitySelect" onchange="setQuality(this.value)" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:4px 8px;border-radius:4px;font-size:11px;max-width:90px">
     <option value="-1">Auto</option>
@@ -595,6 +617,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
 
 <div id="player-overlay">
   <div class="topbar">
+    <button class="heart-btn" id="overlayHeart" onclick="toggleFav()" title="❤️ Favorite" tabindex="0" onkeydown="if(event.key==='Enter')toggleFav()" style="font-size:20px;background:transparent;border:none;cursor:pointer;padding:0 4px;color:#fff">🤍</button>
     <span class="tname" id="overlayName">—</span>
     <select id="overlayQuality" onchange="setQuality(this.value)" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:4px 8px;border-radius:4px;font-size:11px;max-width:90px">
       <option value="-1">Auto</option>
@@ -603,6 +626,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     <button id="overlayCcBtn" onclick="toggleSubtitle()" title="💬 CC" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px">💬</button>
     <button id="overlayAirplayBtn" onclick="toggleAirPlay()" title="📺 AirPlay" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px">📺</button>
     <button id="overlayCastBtn" onclick="toggleCast()" title="📡 Cast" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px">📡 แคสต์</button>
+    <button id="overlayPiPBtn" onclick="togglePiP()" title="🖼️ PiP" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px">🖼️</button>
     <button id="overlayCloseBtn" onclick="closeFullscreen()">⬇ ย่อ</button>
     <button id="overlayStopBtn" onclick="fullStop()" style="background:#e04040">✕ หยุด</button>
   </div>
@@ -641,6 +665,22 @@ const countryName = cc => COUNTRY_NAMES[cc]||cc||'Unknown';
 
 // ====== i18n ======
 var LANG=(()=>{try{return localStorage.getItem('iptv_lang')||'th'}catch(e){return'th'}})();
+var THEME=(()=>{try{return localStorage.getItem('iptv_theme')||'auto'}catch(e){return'auto'}})();
+function applyTheme(){
+  const root=document.documentElement;
+  if(THEME==='dark')root.style.colorScheme='dark';
+  else if(THEME==='light')root.style.colorScheme='light';
+  else root.style.colorScheme='light dark';
+  const tb=document.getElementById('themeToggle');
+  if(tb)tb.textContent=THEME==='dark'?'🌙':THEME==='light'?'☀️':'🌓';
+}
+function toggleTheme(){
+  THEME=THEME==='auto'?'dark':THEME==='dark'?'light':'auto';
+  try{localStorage.setItem('iptv_theme',THEME)}catch(e){}
+  applyTheme();
+}
+applyTheme();
+
 function setLang(l){
   LANG=l;try{localStorage.setItem('iptv_lang',l)}catch(e){}
   refreshLangUI();
@@ -710,6 +750,14 @@ const T={
   subtitleBtn:{en:'💬 CC',th:'💬 ซับ'},
   subtitleOn:{en:'💬 Subtitles ON',th:'💬 ซับเปิด'},
   subtitleOff:{en:'💬 Subtitles OFF',th:'💬 ซับปิด'},
+  pipBtn:{en:'🖼️ PiP',th:'🖼️ PiP'},
+  favRow:{en:'❤️ Favorites',th:'❤️ ช่องโปรด'},
+  favAdded:{en:'Added to Favorites',th:'เพิ่มในช่องโปรด'},
+  favRemoved:{en:'Removed from Favorites',th:'นำออกแล้ว'},
+  channels:{en:'channels',th:'ช่อง'},
+  epgNow:{en:'📅 Now',th:'📅 ตอนนี้'},
+  epgNext:{en:'▶ Next',th:'▶ ถัดไป'},
+  okClose:{en:'OK / Close',th:'ตกลง / ปิด'},
 };
 const tn = (key, ...args) => {
   const v = T[key];
@@ -736,6 +784,8 @@ function refreshLangUI(){
   setTitle('airplayBtn',tn('airplayTitle'));
   setText('overlayAirplayBtn',tn('airplay'));
   setTitle('overlayAirplayBtn',tn('airplayTitle'));
+  setText('pipBtn',tn('pipBtn'));
+  setText('overlayPiPBtn',tn('pipBtn'));
   setText('ccBtn',tn('subtitleBtn'));
   setTitle('ccBtn',tn('ccTitle'));
   setText('overlayCloseBtn',tn('closeFull'));
@@ -903,6 +953,14 @@ function renderHome(){
     html+='</div>';
   }
 
+  // 0.5. ❤️ Favorites
+  const favs=getFavorites(20);
+  if(favs.length>=1){
+    html+='<div class="row-wrap"><div class="row-title">'+tn('favRow')+' <span class="badge">'+favs.length+' '+tn('channels')+'</span></div>';
+    html+=renderRowScroll(favs);
+    html+='</div>';
+  }
+
   // 1. Verified Working ✅ (tested alive)
   const alive=getAliveChannels(20);
   if(alive.length>=5){
@@ -1053,6 +1111,44 @@ function getRecentlyWatched(n){
   }
   return result;
 }
+
+function loadFavs(){
+  try{return JSON.parse(localStorage.getItem('iptv_favs')||'{}')}catch(e){return{}}
+}
+function saveFavs(f){try{localStorage.setItem('iptv_favs',JSON.stringify(f))}catch(e){}}
+function isFav(ch){if(!ch||!ch.url)return false;return!!loadFavs()[urlHash(ch.url)]}
+function toggleFav(){
+  if(!currentChannel||!currentChannel.url)return;
+  const h=urlHash(currentChannel.url);
+  const favs=loadFavs();
+  if(favs[h]){delete favs[h]}
+  else{favs[h]={name:currentChannel.name,country:currentChannel.country,quality:currentChannel.quality,cat:currentChannel.cat,logo:currentChannel.logo,url:currentChannel.url}}
+  saveFavs(favs);
+  updateHeartUI();
+  toast(isFav(currentChannel)?'❤️ '+tn('favAdded'):'🤍 '+tn('favRemoved'));
+}
+function getFavorites(n){
+  const favs=loadFavs();
+  const hashToCh={};
+  for(const ch of ALL){if(ch.url)hashToCh[urlHash(ch.url)]=ch;}
+  const result=[];
+  for(const [h,data] of Object.entries(favs)){
+    if(result.length>=n)break;
+    const ch=hashToCh[h];
+    if(ch){result.push(ch);continue;}
+    if(data&&data.name)result.push({name:data.name,country:data.country,quality:data.quality,cat:data.cat,logo:data.logo,url:data.url,_stale:true});
+  }
+  return result;
+}
+function updateHeartUI(){
+  const on=isFav(currentChannel);
+  ['barHeart','overlayHeart'].forEach(id=>{
+    const b=$(id);if(!b)return;
+    b.textContent=on?'❤️':'🤍';
+    if(on)b.classList.add('on');else b.classList.remove('on');
+  });
+}
+
 function clearRecentlyWatched(){
   try{localStorage.setItem('iptv_recent','{}')}catch(e){}
   goHome();
@@ -1212,6 +1308,7 @@ function renderRowScroll(channels, playCounts){
         ${logoHtml}
         ${ch.quality?`<span class="ql-badge">${ch.quality}</span>`:''}
         ${cntBadge}${staleBadge}
+        ${ch._epgNow?`<span class="epg-badge" style="position:absolute;bottom:4px;left:4px;right:4px;background:rgba(0,0,0,.75);color:#f0a030;font-size:9px;padding:1px 4px;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;z-index:3">📅 ${esc(ch._epgNow)}</span>`:''}
       </div>
       <div class="info">
         <div class="name">${esc(ch.name)}</div>
@@ -1268,8 +1365,11 @@ function play(idx){
   
   // Update highlights
   document.querySelectorAll('.card.playing').forEach(c=>c.classList.remove('playing'));
+  updateHeartUI();
   initPlayer(ch);
   recordPlay(idx);
+  showPiPButton();
+  loadEpgForChannel(ch);
   
   // On mobile/tablet: auto fullscreen
   if(isMobile()){
@@ -1427,6 +1527,7 @@ function stop(){
   currentChannel=null;
   resetPlayerUIs();
   $('player-bar').classList.remove('on');
+  ['barHeart','overlayHeart'].forEach(id=>{const b=$(id);if(b){b.textContent='🤍';b.classList.remove('on');}});
   $('player-overlay').classList.remove('on');
   document.querySelectorAll('.card.playing').forEach(c=>c.classList.remove('playing'));
 }
@@ -1487,7 +1588,52 @@ function toast(msg){
   setTimeout(()=>t.classList.remove('show'),2000);
 }
 
+
+// ── Keyboard Shortcuts ──
+function showShortcuts(){
+  const m=document.getElementById('shortcuts-modal');
+  m.style.display='flex';
+  refreshShortcutsLang();
+}
+function refreshShortcutsLang(){
+  const map={
+    'scHelp':{en:'Show shortcuts panel',th:'แสดงแผงคีย์ลัด'},
+    'scSearch':{en:'Search channels',th:'ค้นหาช่อง'},
+    'scFullscreen':{en:'Fullscreen',th:'เต็มจอ'},
+    'scEsc':{en:'Close fullscreen / Stop',th:'ปิดเต็มจอ / หยุด'},
+    'scArrows':{en:'Navigate (D-pad)',th:'นำทาง (รีโมท)'},
+    'scEnter':{en:'Play channel',th:'เล่นช่อง'},
+    'scSpace':{en:'Play / Pause',th:'เล่น / หยุด'},
+    'scCast':{en:'Cast / AirPlay',th:'แคสต์ / AirPlay'},
+    'scSubtitle':{en:'Toggle subtitles',th:'เปิด/ปิดซับ'},
+    'scPiP':{en:'Picture-in-Picture',th:'รูปภาพซ้อนรูปภาพ'},
+    'scFav':{en:'Toggle favorite',th:'เปิด/ปิดช่องโปรด'},
+    'scDpad':{en:'🎮 Android TV / Remote: use direction + OK + Back',th:'🎮 กล่อง Android TV / รีโมท: ใช้ปุ่มทิศทาง + OK + Back'},
+    'scClose':{en:'OK / Close',th:'ตกลง / ปิด'},
+  };
+  for(const [id,texts] of Object.entries(map)){
+    const el=document.getElementById(id);
+    if(el)el.textContent=texts[LANG]||texts.en;
+  }
+  document.getElementById('shortcutsTitle').textContent=LANG==='th'?'⌨️ คีย์ลัด / รีโมท':'⌨️ Keyboard Shortcuts / Remote';
+}
+
 document.addEventListener('keydown',e=>{
+  // Don't capture shortcuts when typing in input
+  const tag=e.target.tagName;
+  if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT')return;
+  const mod=e.ctrlKey||e.metaKey;
+  
+  if(e.key==='?'||(mod&&e.key==='/')){e.preventDefault();showShortcuts();return}
+  if(e.key==='f'&&!mod){e.preventDefault();openFullscreen();return}
+  if(e.key===' '){e.preventDefault();const v=$('video');if(v){v.paused?v.play():v.pause()};return}
+  if(e.key==='c'&&!mod){e.preventDefault();if(airplayAvailable)toggleAirPlay();else toggleCast();return}
+  if(e.key==='s'&&!mod){e.preventDefault();toggleSubtitle();return}
+  if(e.key==='p'&&!mod){e.preventDefault();togglePiP();return}
+  if(e.key==='h'&&!mod){e.preventDefault();toggleFav();return}
+  // Back button (Android TV / remote)
+  if(e.key==='Backspace'||e.key==='GoBack'){e.preventDefault();if($('player-overlay').classList.contains('on'))closeFullscreen();else if(currentChannel)stop();return}
+
   if(e.key==='Escape'){
     if($('player-overlay').classList.contains('on'))closeFullscreen();
     else if(currentChannel)stop();
@@ -1617,6 +1763,39 @@ function toggleAirPlay(){
   const v=$('video');
   if(v&&v.webkitShowPlaybackTargetPicker)v.webkitShowPlaybackTargetPicker();
 }
+function setupPiP(){
+  if('pictureInPictureEnabled'in document){
+    document.addEventListener('enterpictureinpicture',()=>{
+      ['pipBtn','overlayPiPBtn'].forEach(id=>{const b=$(id);if(b)b.textContent='📌';});
+    });
+    document.addEventListener('leavepictureinpicture',()=>{
+      ['pipBtn','overlayPiPBtn'].forEach(id=>{const b=$(id);if(b)b.textContent='🖼️';});
+    });
+    // Auto-show PiP button when video has src
+    const v=$('video');
+    if(v){
+      v.addEventListener('loadedmetadata',()=>{
+        const ok=document.pictureInPictureEnabled&&!v.disablePictureInPicture;
+        ['pipBtn','overlayPiPBtn'].forEach(id=>{const b=$(id);if(b)b.style.display=ok?'inline-block':'none';});
+      });
+    }
+  }
+}
+function togglePiP(){
+  const v=$('video');
+  if(!v)return;
+  try{
+    if(document.pictureInPictureElement)document.exitPictureInPicture();
+    else v.requestPictureInPicture();
+  }catch(e){}
+}
+// Show PiP button on play
+function showPiPButton(){
+  if(document.pictureInPictureEnabled){
+    ['pipBtn','overlayPiPBtn'].forEach(id=>{const b=$(id);if(b)b.style.display='inline-block';});
+  }
+}
+
 function toggleCast(){
   const ctx=cast.framework.CastContext.getInstance();
   if(castSession){
@@ -1671,6 +1850,7 @@ function doLogout(){
   if(hls){hls.destroy();hls=null}
   $('video').src='';currentChannel=null;
   $('player-bar').classList.remove('on');
+  ['barHeart','overlayHeart'].forEach(id=>{const b=$(id);if(b){b.textContent='🤍';b.classList.remove('on');}});
   $('player-overlay').classList.remove('on');
   $('login-overlay').classList.remove('hidden');
   $('loginPass').value='';$('loginError').textContent='';
@@ -1836,6 +2016,88 @@ function testVisibleChannels(){
   }
 }
 
+
+// ── EPG (Electronic Program Guide) — จาก iptv-org ──
+var epgCache={};
+const EPG_KEY='iptv_epg_v1';
+
+function loadEpgCache(){
+  try{epgCache=JSON.parse(localStorage.getItem(EPG_KEY)||'{}')}catch(e){epgCache={}}
+  // Clear old cache (>24h)
+  const now=Date.now();
+  for(const k of Object.keys(epgCache)){if(now-epgCache[k]._ts>86400000)delete epgCache[k]}
+}
+function saveEpgCache(){try{localStorage.setItem(EPG_KEY,JSON.stringify(epgCache))}catch(e){}}
+
+async function fetchEpg(ch){
+  if(!ch||!ch.url)return;
+  const h=urlHash(ch.url);
+  // Check cache (<1h)
+  if(epgCache[h]&&Date.now()-epgCache[h]._ts<3600000){
+    showEpg(ch,epgCache[h]);
+    return;
+  }
+  // Try fetching channel guide from iptv-org
+  try{
+    const tvgId=ch.name.replace(/\s+/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+    const r=await fetch(`https://iptv-org.github.io/iptv/guides/en/${tvgId}.xml`,{signal:AbortSignal.timeout(5000)});
+    if(!r.ok)return;
+    const xml=await r.text();
+    const programs=parseEpgXml(xml,ch.name);
+    if(programs.length){
+      epgCache[h]={_ts:Date.now(), programs:programs.slice(0,20)};
+      saveEpgCache();
+      showEpg(ch,epgCache[h]);
+    }
+  }catch(e){}
+}
+
+function parseEpgXml(xml,chName){
+  const programs=[];
+  const regex=/<programme[^>]*start="([^"]+)"[^>]*stop="([^"]+)">[\s\S]*?<title[^>]*>([^<]+)<\/title>/gi;
+  let m;
+  while((m=regex.exec(xml))!==null){
+    programs.push({start:m[1],stop:m[2],title:m[3].trim()});
+    if(programs.length>=20)break;
+  }
+  return programs;
+}
+
+function showEpg(ch,data){
+  const now=new Date();
+  let nowTitle='',nextTitle='';
+  for(const p of data.programs||[]){
+    const start=new Date(p.start.replace(' ','T')),stop=new Date(p.stop.replace(' ','T'));
+    if(now>=start&&now<stop){nowTitle=p.title;continue;}
+    if(start>now&&!nextTitle){nextTitle=p.title;break;}
+  }
+  if(nowTitle){
+    ch._epgNow=nowTitle;
+    if(nextTitle)ch._epgNext=nextTitle;
+    // Update player bar
+    if(currentChannel&&currentChannel.url===ch.url){
+      const el=$('barEpg');
+      if(el){el.style.display='block';el.textContent='📅 '+nowTitle+(nextTitle?' · ▶ '+nextTitle:'');}
+    }
+    // Re-render current cards (refresh home)
+    refreshEpgCards();
+  }
+}
+
+function refreshEpgCards(){
+  document.querySelectorAll('.epg-badge').forEach(el=>{
+    // Already rendered by renderRowScroll — handled at render time
+  });
+}
+
+// Auto-fetch EPG when channel is played
+function loadEpgForChannel(ch){
+  if(!ch)return;
+  fetchEpg(ch);
+}
+
+loadEpgCache();
+
 // ====== BOOT ======
 loadStreamStatus();
 if(isLoggedIn()){
@@ -1901,5 +2163,27 @@ const style=document.createElement('style');
 style.textContent='@keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}@keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}';
 document.head.appendChild(style);
 </script>
+
+<div id="shortcuts-modal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.85);justify-content:center;align-items:center;flex-direction:column" onclick="this.style.display='none'">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;max-width:460px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.6)" onclick="event.stopPropagation()">
+    <h2 style="margin:0 0 16px;font-size:20px">⌨️ <span id="shortcutsTitle">Keyboard Shortcuts</span>Keyboard Shortcuts / รีโมท</span></h2>
+    <div id="shortcutsList" style="display:grid;grid-template-columns:auto 1fr;gap:8px 16px;font-size:13px;align-items:center">
+      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">?</kbd><span id="scHelp">Show this panel</span>
+      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">Ctrl+F</kbd><span id="scSearch">Focus search</span>
+      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">F</kbd><span id="scFullscreen">Fullscreen</span>
+      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">Esc</kbd><span id="scEsc">Close fullscreen / Stop</span>
+      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">←↑↓→</kbd><span id="scArrows">Navigate (D-pad)</span>
+      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">Enter</kbd><span id="scEnter">Play channel</span>
+      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">Space</kbd><span id="scSpace">Play/Pause</span>
+      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">C</kbd><span id="scCast">Cast / AirPlay</span>
+      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">S</kbd><span id="scSubtitle">Toggle subtitles</span>
+      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">P</kbd><span id="scPiP">Picture-in-Picture</span>
+      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">❤ / H</kbd><span id="scFav">Toggle favorite</span>
+    </div>
+    <p style="margin-top:16px;font-size:11px;color:var(--dim);text-align:center" id="scDpad">🎮 Android TV / รีโมท: ใช้ปุ่มทิศทาง + OK + Back</p>
+    <button onclick="document.getElementById('shortcuts-modal').style.display='none'" style="display:block;margin:12px auto 0;background:var(--accent);color:#000;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:600" id="scClose">OK / ปิด</button>
+  </div>
+</div>
+
 </body>
 </html>
