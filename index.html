@@ -218,6 +218,15 @@ body{
   background:var(--live);
   box-shadow:0 0 6px var(--live);
 }
+.row-scroll .card .poster .status-dot{
+  position:absolute;bottom:8px;left:8px;
+  width:10px;height:10px;border-radius:50%;
+  z-index:2;
+}
+.status-dot.alive{background:#22c55e;box-shadow:0 0 8px #22c55e}
+.status-dot.dead{background:#ef4444;box-shadow:0 0 8px #ef4444}
+.status-dot.testing{background:#f59e0b;animation:pulse 1s infinite}
+.status-dot.unknown{background:#555}
 .row-scroll .card .info{padding:10px 12px}
 .row-scroll .card .info .name{
   font-size:13px;font-weight:600;
@@ -542,6 +551,7 @@ body{
       <span style="margin-left:8px;font-size:10px;opacity:.5" id="updateTime"></span>
     </div>
     <button onclick="refreshData()" title="Refresh from iptv-org" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:7px 14px;border-radius:6px;cursor:pointer;font-size:12px;margin-left:8px">🔄 Refresh</button>
+    <button onclick="testVisibleChannels()" title="Test stream signals" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:7px 12px;border-radius:6px;cursor:pointer;font-size:12px">📶 Test</button>
     <button onclick="doLogout()" id="logout-btn">🚪 Logout</button>
   </div>
   <div id="content">
@@ -767,6 +777,7 @@ function renderHome(){
   }
   
   $('content').innerHTML=html;
+  setTimeout(autoTestVisible,500);
 }
 
 function getTopCategories(n){
@@ -814,6 +825,7 @@ function renderCountry(cc){
   }
   
   $('content').innerHTML=html;
+  setTimeout(autoTestVisible,500);
 }
 
 // ====== RENDER: CATEGORY (grid view) ======
@@ -832,9 +844,10 @@ function renderCategory(cc,cat){
     const cls=playing?'card playing':'card';
     const qlClass=(!ch.quality||parseInt(ch.quality)<720)?'sd':'';
     const idx=ALL.indexOf(ch);
+    const sd=statusDot(ch);
     
     html+=`<div class="${cls}" onclick="play(${idx})" tabindex="0" onkeydown="if(event.key==='Enter')play(${idx})">
-      <div class="thumb">${flag||'📺'}</div>
+      <div class="thumb">${flag||'📺'}${sd}</div>
       <div class="detail">
         <div class="nm">${esc(ch.name)}</div>
         <div class="mt">${esc(ch.cat)}${ch.geo?' · 🔒':''}${ch.not247?' · ⏰':''}</div>
@@ -844,6 +857,7 @@ function renderCategory(cc,cat){
   }
   html+='</div>';
   $('content').innerHTML=html;
+  setTimeout(autoTestVisible,500);
 }
 
 // ====== RENDER: SEARCH ======
@@ -880,6 +894,7 @@ function renderSearchResults(q){
     html+='<div style="text-align:center;padding:20px;color:var(--dim)">Showing first 500 of '+results.length.toLocaleString()+' results. Refine your search.</div>';
   }
   $('content').innerHTML=html;
+  setTimeout(autoTestVisible,500);
 }
 
 // ====== HORIZONTAL ROW COMPONENT ======
@@ -892,11 +907,13 @@ function renderRow(title,subtitle,channels){
     const playing=currentChannel&&currentChannel.name===ch.name&&currentChannel.url===ch.url;
     const cls=playing?'card playing':'card';
     const idx=ALL.indexOf(ch);
+    const sd=statusDot(ch);
     const logoHtml=ch.logo?`<img src="${esc(ch.logo)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt=""><div class="poster-cc" style="display:none"><span>${ch.country||'??'}</span></div>`:`<div class="poster-cc"><span>${ch.country||'??'}</span></div>`;
     
     h+=`<div class="${cls}" onclick="play(${idx})" tabindex="0" onkeydown="if(event.key==='Enter')play(${idx})">
       <div class="poster">
         ${ch.geo?'<div class="live-dot" style="background:#e04040;box-shadow:0 0 6px #e04040"></div>':''}
+        ${sd}
         ${logoHtml}
         ${ch.quality?`<span class="ql-badge">${ch.quality}</span>`:''}
       </div>
@@ -961,6 +978,10 @@ function initPlayer(ch){
     hls.attachMedia(video);
     hls.on(Hls.Events.MANIFEST_PARSED,(ev,data)=>{
       buildQualityUI(hls.levels);
+      // Mark stream as alive
+      const h=urlHash(ch.url);
+      streamStatus[h]={status:'alive',time:Date.now()};
+      saveStreamStatus();refreshStatusUI();
       video.play().then(()=>toast('▶ Playing'))
         .catch(()=>toast('⚠️ Tap to start'));
     });
@@ -968,6 +989,10 @@ function initPlayer(ch){
       console.warn('HLS error:',data.type,data.details);
       if(data.fatal){
         hls.destroy();hls=null;
+        // Mark as dead
+        const h=urlHash(ch.url);
+        streamStatus[h]={status:'dead',time:Date.now()};
+        saveStreamStatus();refreshStatusUI();
         // Try direct play as fallback
         video.src=ch.url;
         video.play().catch(()=>{
@@ -1212,7 +1237,123 @@ function doLogout(){
   $('chCount').textContent='—';
 }
 
+// ====== STREAM TESTING ======
+const STREAM_KEY='iptv_stream_status';
+var streamStatus={}; // {urlHash: {status:'alive'|'dead',time:timestamp}}
+var testQueue=[];
+var testing=false;
+
+function loadStreamStatus(){
+  try{streamStatus=JSON.parse(localStorage.getItem(STREAM_KEY)||'{}')}catch(e){streamStatus={}}
+  // Clear statuses older than 24h
+  const now=Date.now();
+  for(const k of Object.keys(streamStatus)){
+    if(now-streamStatus[k].time>86400000)delete streamStatus[k];
+  }
+}
+function saveStreamStatus(){try{localStorage.setItem(STREAM_KEY,JSON.stringify(streamStatus))}catch(e){}}
+function urlHash(url){let h=0;for(let i=0;i<Math.min(url.length,200);i++)h=((h<<5)-h)+url.charCodeAt(i)|0;return Math.abs(h).toString(36)}
+function getStatus(ch){const s=streamStatus[urlHash(ch.url)];return s?s.status:'unknown'}
+
+function testChannel(ch){
+  const h=urlHash(ch.url);
+  if(streamStatus[h]&&Date.now()-streamStatus[h].time<3600000)return; // tested within 1h
+  
+  streamStatus[h]={status:'testing',time:Date.now()};
+  
+  // Use hidden video element to test M3U8 connectivity
+  const tester=document.createElement('video');
+  tester.muted=true;tester.volume=0;tester.style.display='none';
+  tester.preload='metadata';
+  
+  const timeout=setTimeout(()=>{
+    tester.remove();
+    streamStatus[h]={status:'dead',time:Date.now()};
+    saveStreamStatus();
+    refreshStatusUI();
+  },8000);
+  
+  tester.onloadedmetadata=()=>{
+    clearTimeout(timeout);
+    tester.remove();
+    streamStatus[h]={status:'alive',time:Date.now()};
+    saveStreamStatus();
+    refreshStatusUI();
+  };
+  tester.onerror=()=>{
+    clearTimeout(timeout);
+    tester.remove();
+    streamStatus[h]={status:'dead',time:Date.now()};
+    saveStreamStatus();
+    refreshStatusUI();
+  };
+  
+  document.body.appendChild(tester);
+  tester.src=ch.url;
+}
+
+function testChannels(channels,max=5){
+  let tested=0;
+  for(const ch of channels){
+    if(tested>=max)break;
+    const h=urlHash(ch.url);
+    if(!streamStatus[h]||Date.now()-streamStatus[h].time>3600000){
+      testChannel(ch);tested++;
+    }
+  }
+}
+
+function refreshStatusUI(){
+  document.querySelectorAll('.status-dot').forEach(el=>{
+    const h=el.dataset.hash;
+    const s=streamStatus[h];
+    if(s){el.className='status-dot '+s.status}
+  });
+}
+
+function statusDot(ch){
+  const h=urlHash(ch.url);
+  const s=streamStatus[h];
+  const cls=s?s.status:'unknown';
+  return`<span class="status-dot ${cls}" data-hash="${h}" title="${cls==='alive'?'✅ Working':cls==='dead'?'❌ Dead':'⏳ Unknown'}"></span>`;
+}
+
+// Auto-test channels when browsing a category
+function autoTestVisible(){
+  const cards=document.querySelectorAll('.card');
+  const toTest=[];
+  cards.forEach(c=>{
+    const onclick=c.getAttribute('onclick');
+    if(!onclick)return;
+    const m=onclick.match(/play\((\d+)\)/);
+    if(!m)return;
+    const ch=ALL[parseInt(m[1])];
+    if(ch&&getStatus(ch)==='unknown')toTest.push(ch);
+  });
+  if(toTest.length)testChannels(toTest,3);
+}
+
+function testVisibleChannels(){
+  const cards=document.querySelectorAll('.card');
+  const toTest=[];
+  cards.forEach(c=>{
+    const onclick=c.getAttribute('onclick');
+    if(!onclick)return;
+    const m=onclick.match(/play\((\d+)\)/);
+    if(!m)return;
+    const ch=ALL[parseInt(m[1])];
+    if(ch)toTest.push(ch);
+  });
+  if(toTest.length){
+    toast('📶 Testing '+toTest.length+' channels...');
+    testChannels(toTest,10);
+  }else{
+    toast('No channels visible');
+  }
+}
+
 // ====== BOOT ======
+loadStreamStatus();
 if(isLoggedIn()){
   $('login-overlay').classList.add('hidden');
   loadData();
