@@ -1,6 +1,6 @@
-// 📺 IPTV Player — Service Worker v2
+// 📺 IPTV Player — Service Worker v3
 // Cache strategy: Network-first for HTML, cache static assets
-const CACHE = 'iptv-player-v2';
+const CACHE = 'iptv-player-v3';
 const ASSETS = [
   '/iptv-player/',
   '/iptv-player/manifest.json',
