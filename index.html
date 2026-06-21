@@ -677,6 +677,7 @@ const T={
   updateAvail:{en:'⚠️ Update available',th:'⚠️ มีอัปเดต'},
   justNow:{en:'just now',th:'เมื่อกี้'},
   cached:{en:'cached',th:'แคช'},
+  clearRecent:{en:'🗑 Clear',th:'🗑 ล้าง'},
 };
 const tn = (key, ...args) => {
   const v = T[key];
@@ -840,13 +841,19 @@ function renderHome(){
   // 0. Recently Watched 🕐 (always first)
   const recent=getRecentlyWatched(20);
   if(recent.length>=1){
-    html+=renderRow(tn('recentRow'),tn('recentSub'),recent);
+    html+='<div class="row-wrap"><div class="row-title">'+tn('recentRow')+' <span class="badge">'+tn('recentSub')+'</span>'
+      +'<button onclick="clearRecentlyWatched()" style="margin-left:auto;background:var(--surface2);color:var(--dim);border:1px solid var(--border);padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px" title="'+tn('clearRecent')+'">'+tn('clearRecent')+'</button></div>';
+    html+=renderRowScroll(recent);
+    html+='</div>';
   }
 
-  // 1. Most Played 🔥 (tracked locally)
+  // 1. 🔥 Most Played with view counts
   const played=getMostPlayed(20);
-  if(played.length>=5){
-    html+=renderRow(tn('playedRow'),tn('playedSub'),played);
+  if(played.length>=3){
+    const playCounts=loadPlayCounts();
+    html+='<div class="row-wrap"><div class="row-title">'+tn('playedRow')+' <span class="badge">'+tn('playedSub')+'</span></div>';
+    html+=renderRowScroll(played, playCounts);
+    html+='</div>';
   }
 
   // 2. Verified Working ✅ (tested alive)
@@ -887,41 +894,121 @@ function getCatChannels(cat,max){
   const r=[];for(const ch of ALL){if(ch.cat===cat){r.push(ch);if(r.length>=max)break}}return r;
 }
 
+// 🔧 Migration helper: old data used array indices; new data uses URL hashes
+function _migratePlays(){
+  try{
+    const raw=JSON.parse(localStorage.getItem('iptv_plays')||'{}');
+    const keys=Object.keys(raw);
+    if(keys.length>0&&keys.every(k=>/^\d+$/.test(k))){
+      // Convert old index-based to hash-based
+      const n={};
+      for(const [idx,cnt] of Object.entries(raw)){
+        const i=parseInt(idx);
+        if(i<ALL.length&&ALL[i]&&ALL[i].url){
+          n[urlHash(ALL[i].url)]=cnt;
+        }
+      }
+      return n;
+    }
+    return raw;
+  }catch(e){return{}}
+}
+function _migrateRecent(){
+  try{
+    const raw=JSON.parse(localStorage.getItem('iptv_recent')||'{}');
+    const keys=Object.keys(raw);
+    if(keys.length>0&&keys.every(k=>/^\d+$/.test(k))){
+      const n={};
+      for(const [idx,ts] of Object.entries(raw)){
+        const i=parseInt(idx);
+        if(i<ALL.length&&ALL[i]&&ALL[i].url){
+          const h=urlHash(ALL[i].url);
+          const ch=ALL[i];
+          n[h]={ts:ts, name:ch.name, country:ch.country, quality:ch.quality, cat:ch.cat, logo:ch.logo, url:ch.url};
+        }
+      }
+      return n;
+    }
+    return raw;
+  }catch(e){return{}}
+}
+
 function getMostPlayed(n){
   const plays=loadPlayCounts();
+  // Build a fast hash→channel lookup
+  const hashToCh={};
+  for(const ch of ALL){if(ch.url)hashToCh[urlHash(ch.url)]=ch;}
   const sorted=Object.entries(plays).sort((a,b)=>b[1]-a[1]).slice(0,n);
-  return sorted.map(([idx])=>ALL[parseInt(idx)]).filter(Boolean);
+  return sorted.map(([h,cnt])=>{
+    const ch=hashToCh[h]||null;
+    if(ch){ch._playCount=cnt;return ch;}
+    return null;
+  }).filter(Boolean);
 }
+function getMostPlayedChannels(){return loadPlayCounts();}
 
 function getAliveChannels(n){
   const r=[];for(const ch of ALL){if(getStatus(ch)==='alive'){r.push(ch);if(r.length>=n)break}}return r;
 }
 
 function loadPlayCounts(){
-  try{return JSON.parse(localStorage.getItem('iptv_plays')||'{}')}catch(e){return{}}
+  try{
+    const raw=JSON.parse(localStorage.getItem('iptv_plays')||'{}');
+    const keys=Object.keys(raw);
+    // Auto-migrate old index-based data
+    if(keys.length>0&&keys.every(k=>/^\d+$/.test(k)))return _migratePlays();
+    return raw;
+  }catch(e){return{}}
 }
 function savePlayCounts(plays){try{localStorage.setItem('iptv_plays',JSON.stringify(plays))}catch(e){}}
 function recordPlay(idx){
+  const ch=ALL[idx];
+  if(!ch||!ch.url)return;
+  const h=urlHash(ch.url);
+  // Play count
   const plays=loadPlayCounts();
-  plays[idx]=(plays[idx]||0)+1;
+  plays[h]=(plays[h]||0)+1;
   savePlayCounts(plays);
-  // Also track recent watches
+  // Recently watched
   const recent=loadRecentWatches();
-  recent[idx]=Date.now();
+  recent[h]={ts:Date.now(), name:ch.name, country:ch.country, quality:ch.quality, cat:ch.cat, logo:ch.logo, url:ch.url};
   saveRecentWatches(recent);
 }
 
 function loadRecentWatches(){
-  try{return JSON.parse(localStorage.getItem('iptv_recent')||'{}')}catch(e){return{}}
+  try{
+    const raw=JSON.parse(localStorage.getItem('iptv_recent')||'{}');
+    const keys=Object.keys(raw);
+    if(keys.length>0&&keys.every(k=>/^\d+$/.test(k)))return _migrateRecent();
+    return raw;
+  }catch(e){return{}}
 }
 function saveRecentWatches(r){try{localStorage.setItem('iptv_recent',JSON.stringify(r))}catch(e){}}
 function getRecentlyWatched(n){
   const recent=loadRecentWatches();
-  return Object.entries(recent)
-    .sort((a,b)=>b[1]-a[1])
-    .slice(0,n)
-    .map(([idx])=>ALL[parseInt(idx)])
-    .filter(Boolean);
+  // Build hash→channel lookup from ALL
+  const hashToCh={};
+  for(const ch of ALL){if(ch.url)hashToCh[urlHash(ch.url)]=ch;}
+  const result=[];
+  const entries=Object.entries(recent).sort((a,b)=>{
+    const ta=typeof a[1]==='object'?a[1].ts:a[1];
+    const tb=typeof b[1]==='object'?b[1].ts:b[1];
+    return tb-ta;
+  });
+  for(const [h,data] of entries){
+    if(result.length>=n)break;
+    const ch=hashToCh[h];
+    if(ch){result.push(ch);continue;}
+    // Fallback: use stored metadata (channel may have been removed from M3U)
+    if(data&&typeof data==='object'&&data.name){
+      result.push({name:data.name, country:data.country, quality:data.quality, cat:data.cat, logo:data.logo, url:data.url||'', _stale:true});
+    }
+  }
+  return result;
+}
+function clearRecentlyWatched(){
+  try{localStorage.setItem('iptv_recent','{}')}catch(e){}
+  goHome();
 }
 
 function getTopCategories(n){
@@ -1042,10 +1129,17 @@ function renderSearchResults(q){
 }
 
 // ====== HORIZONTAL ROW COMPONENT ======
+// ====== HORIZONTAL ROW COMPONENT ======
 function renderRow(title,subtitle,channels){
   if(!channels.length)return'';
   let h='<div class="row-wrap"><div class="row-title">'+title+' <span class="badge">'+subtitle+'</span></div>';
-  h+='<div class="row-scroll">';
+  h+=renderRowScroll(channels);
+  h+='</div>';
+  return h;
+}
+function renderRowScroll(channels, playCounts){
+  if(!channels||!channels.length)return'';
+  let h='<div class="row-scroll">';
   for(const ch of channels){
     const flag=countryFlag(ch.country);
     const playing=currentChannel&&currentChannel.name===ch.name&&currentChannel.url===ch.url;
@@ -1053,22 +1147,50 @@ function renderRow(title,subtitle,channels){
     const idx=ALL.indexOf(ch);
     const sd=statusDot(ch);
     const logoHtml=ch.logo?`<img src="${esc(ch.logo)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt=""><div class="poster-cc" style="display:none"><span>${ch.country||'??'}</span></div>`:`<div class="poster-cc"><span>${ch.country||'??'}</span></div>`;
+    // Play count badge 🔥
+    let cntBadge='';
+    if(playCounts&&ch.url){
+      const pc=playCounts[urlHash(ch.url)];
+      if(pc&&pc>1)cntBadge=`<span class="ql-badge" style="position:absolute;bottom:8px;right:8px;background:rgba(240,160,48,.85);color:#000;font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px">🔥 ${pc}x</span>`;
+    }
+    // Stale badge for channels not in current playlist
+    let staleBadge='';
+    if(ch._stale)staleBadge='<span class="ql-badge" style="position:absolute;top:8px;right:8px;background:rgba(100,100,100,.8);color:#ccc;font-size:9px;padding:2px 6px;border-radius:3px">📦 offline</span>';
+    // Click handler
+    const clickHandler=ch._stale?`playUrl('${esc(ch.url||'')}')`:`play(${idx})`;
     
-    h+=`<div class="${cls}" onclick="play(${idx})" tabindex="0" onkeydown="if(event.key==='Enter')play(${idx})">
+    h+=`<div class="${cls}" onclick="${clickHandler}" tabindex="0" onkeydown="if(event.key==='Enter')${clickHandler}">
       <div class="poster">
         ${ch.geo?'<div class="live-dot" style="background:#e04040;box-shadow:0 0 6px #e04040"></div>':''}
         ${sd}
         ${logoHtml}
         ${ch.quality?`<span class="ql-badge">${ch.quality}</span>`:''}
+        ${cntBadge}${staleBadge}
       </div>
       <div class="info">
         <div class="name">${esc(ch.name)}</div>
-        <div class="meta">${flag||''} ${esc(ch.cat)}${ch.geo?' 🔒':''}</div>
+        <div class="meta">${flag||''} ${esc(ch.cat||'')}${ch.geo?' 🔒':''}${ch._stale?' · ⚠️':''}</div>
       </div>
     </div>`;
   }
-  h+='</div></div>';
+  h+='</div>';
   return h;
+}
+function playUrl(url){
+  if(!url)return;
+  // Find channel by URL in ALL
+  for(let i=0;i<ALL.length;i++){
+    if(ALL[i].url===url){play(i);return;}
+  }
+  // Not found — create temp channel and play directly
+  const ch={name:'Channel',url:url,cat:'Recent',country:null,quality:null,logo:null,geo:false,not247:false};
+  currentChannel=ch;
+  $('barThumb').innerHTML='📺';
+  $('barName').textContent=ch.name;
+  $('barSub').textContent=ch.cat;
+  $('player-bar').classList.add('on');
+  initPlayer(ch);
+  if(isMobile())openFullscreen();
 }
 
 // ====== SEARCH ======
