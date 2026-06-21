@@ -557,7 +557,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     </form>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
-    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.1.0</div>
+    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.1.1</div>
   </div>
 </div>
 
@@ -1396,7 +1396,8 @@ function playUrl(url){
   $('barSub').textContent=ch.cat;
   $('player-bar').classList.add('on');
   initPlayer(ch);
-  setTimeout(()=>openFullscreen(),100);
+  $('player-overlay').classList.add('on');
+  openFullscreen();
 }
 
 // ====== SEARCH ======
@@ -1434,14 +1435,20 @@ function play(idx){
   showPiPButton();
   loadEpgForChannel(ch);
   
-  // Auto fullscreen on all devices for immediate playback
-  setTimeout(()=>openFullscreen(),100);
+  // Show overlay first (so video has a visible container to render into)
+  $('player-overlay').classList.add('on');
+  // Auto fullscreen — called from click handler so user gesture is preserved
+  openFullscreen();
 }
 
 function initPlayer(ch){
   const video=$('video');
+  // Fully destroy previous HLS instance
   if(hls){hls.destroy();hls=null}
+  // Hard reset video element — clear src and force reload to release MediaSource
+  video.removeAttribute('src');
   video.src='';
+  video.load();
   resetPlayerUIs();
   
   // Show loading toast
@@ -1582,7 +1589,11 @@ function setQuality(val){
 function stop(){
   if(castSession){castSession.endSession(true);castSession=null;updateCastUI()}
   if(hls){hls.destroy();hls=null}
-  $('video').src='';
+  const v=$('video');
+  v.removeAttribute('src');
+  v.src='';
+  v.load(); // hard reset MediaSource
+  v.style.display=''; // ensure visible for next play
   currentChannel=null;
   resetPlayerUIs();
   $('player-bar').classList.remove('on');
