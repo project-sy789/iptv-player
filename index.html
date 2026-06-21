@@ -1398,11 +1398,55 @@ function stop(){
 }
 function openFullscreen(){
   if(!currentChannel)return;
-  $('player-overlay').classList.add('on');
-  $('video').play().catch(()=>{});
+  const v=$('video');
+  // Try native fullscreen first (hides browser chrome, true fullscreen)
+  if(v.requestFullscreen){
+    v.requestFullscreen().catch(()=>{
+      // Fallback: CSS overlay
+      $('player-overlay').classList.add('on');
+    });
+  }else if(v.webkitRequestFullscreen){
+    v.webkitRequestFullscreen();
+  }else if(v.webkitEnterFullscreen){ // iOS Safari
+    v.webkitEnterFullscreen();
+  }else{
+    // CSS fallback
+    $('player-overlay').classList.add('on');
+  }
+  v.play().catch(()=>{});
 }
-function closeFullscreen(){$('player-overlay').classList.remove('on')}
-function fullStop(){closeFullscreen();stop()}
+
+// Listen for native fullscreen exit
+function onFullscreenChange(){
+  if(!document.fullscreenElement&&!document.webkitFullscreenElement){
+    // Exited native fullscreen
+    if(isMobile()){
+      stop(); // mobile: exit = stop (like Netflix/YouTube)
+    }else{
+      // desktop: return to mini player
+      $('player-overlay').classList.remove('on');
+    }
+  }
+}
+document.addEventListener('fullscreenchange',onFullscreenChange);
+document.addEventListener('webkitfullscreenchange',onFullscreenChange);
+
+function closeFullscreen(){
+  // Exit native fullscreen if active
+  if(document.fullscreenElement||document.webkitFullscreenElement){
+    if(document.exitFullscreen){
+      document.exitFullscreen().catch(()=>{});
+    }else if(document.webkitExitFullscreen){
+      document.webkitExitFullscreen();
+    }
+  }
+  $('player-overlay').classList.remove('on');
+}
+
+function fullStop(){
+  closeFullscreen();
+  stop();
+}
 
 function toast(msg){
   const t=$('toast');t.textContent=msg;t.classList.add('show');
