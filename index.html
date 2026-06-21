@@ -571,7 +571,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     </form>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
-    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.4.0</div>
+    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.5.0</div>
   </div>
 </div>
 
@@ -1654,25 +1654,39 @@ function stop(){
 function openFullscreen(){
   if(!currentChannel)return;
   const v=$('video');
+  const overlay=$('player-overlay');
+
   // iPad/iPhone: use iOS-native fullscreen (best experience)
   if(v.webkitEnterFullscreen){
-    try { v.webkitEnterFullscreen(); } catch(e) {
-      $('player-overlay').classList.add('on');
+    // Ensure video is playing BEFORE entering fullscreen
+    // Fixes: re-entry fails after exit because video pauses
+    var p=v.play();
+    if(p) p.catch(()=>{});
+    try {
+      v.webkitEnterFullscreen();
+    } catch(e) {
+      // iOS native failed → CSS overlay fallback
+      overlay.classList.add('on');
     }
-    v.play().catch(()=>{});
     return;
   }
-  // Android/Desktop: try standard Fullscreen API
-  if(v.requestFullscreen){
-    v.requestFullscreen().catch(()=>{
-      $('player-overlay').classList.add('on');
+
+  // Desktop: fullscreen the OVERLAY (includes topbar + video)
+  // This way quality/audio/subtitle buttons stay visible
+  overlay.classList.add('on');
+  if(overlay.requestFullscreen){
+    overlay.requestFullscreen().catch(()=>{
+      // Already showing CSS overlay from .on above
     });
+  }else if(overlay.webkitRequestFullscreen){
+    overlay.webkitRequestFullscreen();
+  }else if(v.requestFullscreen){
+    // Android fallback: fullscreen just the video
+    v.requestFullscreen().catch(()=>{});
   }else if(v.webkitRequestFullscreen){
     v.webkitRequestFullscreen();
-  }else{
-    // CSS fallback
-    $('player-overlay').classList.add('on');
   }
+  // CSS overlay is already visible (.on added above)
   v.play().catch(()=>{});
 }
 
@@ -1688,7 +1702,7 @@ document.addEventListener('fullscreenchange',onFullscreenChange);
 document.addEventListener('webkitfullscreenchange',onFullscreenChange);
 
 function closeFullscreen(){
-  // Exit native fullscreen if active
+  // Exit native fullscreen if active (iOS or desktop)
   if(document.fullscreenElement||document.webkitFullscreenElement){
     if(document.exitFullscreen){
       document.exitFullscreen().catch(()=>{});
@@ -1696,6 +1710,7 @@ function closeFullscreen(){
       document.webkitExitFullscreen();
     }
   }
+  // Remove CSS overlay — onFullscreenChange will also do this when exit completes
   $('player-overlay').classList.remove('on');
 }
 

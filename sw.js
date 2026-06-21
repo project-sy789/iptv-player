@@ -1,6 +1,6 @@
-// 📺 IPTV Player — Service Worker v3
-// Cache strategy: Network-first for HTML, cache static assets
-const CACHE = 'iptv-player-v3';
+// 📺 IPTV Player — Service Worker v4
+// v4: fixes fullscreen re-entry + overlay topbar visibility
+const CACHE = 'iptv-player-v4';
 const ASSETS = [
   '/iptv-player/',
   '/iptv-player/manifest.json',
