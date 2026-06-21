@@ -356,6 +356,9 @@ body{
 #player-bar button.danger:hover{opacity:.85}
 #qualitySelect{max-width:70px!important;font-size:10px!important}
 #overlayQuality{max-width:70px!important;font-size:10px!important}
+#audioSelect{max-width:60px!important;font-size:10px!important}
+#overlayAudio{max-width:60px!important;font-size:10px!important}
+#ccBtn.on,#overlayCcBtn.on{background:var(--live)!important;color:#000!important}
 
 /* Fullscreen player */
 #player-overlay{
@@ -874,13 +877,13 @@ function renderHome(){
     html+=renderRow(tn('aliveRow'),tn('aliveSub'),alive);
   }
 
-  // 3. Featured (high quality, broader criteria)
+  // 2. Featured (high quality, broader criteria)
   const featured=ALL.filter(c=>c.quality&&parseInt(c.quality)>=720).slice(0,25);
   if(featured.length>=5){
     html+=renderRow(tn('featRow'),tn('featSub'),featured);
   }
 
-  // 4. Popular categories with live channels
+  // 3. Popular categories with live channels
   const popularCats=['Sports','News','Entertainment','Music','Movies','Kids','Documentary'];
   for(const cat of popularCats){
     const chs=getCatChannels(cat,25);
@@ -1141,7 +1144,6 @@ function renderSearchResults(q){
 }
 
 // ====== HORIZONTAL ROW COMPONENT ======
-// ====== HORIZONTAL ROW COMPONENT ======
 function renderRow(title,subtitle,channels){
   if(!channels.length)return'';
   let h='<div class="row-wrap"><div class="row-title">'+title+' <span class="badge">'+subtitle+'</span></div>';
@@ -1249,7 +1251,7 @@ function initPlayer(ch){
   const video=$('video');
   if(hls){hls.destroy();hls=null}
   video.src='';
-  resetQualityUI();
+  resetPlayerUIs();
   
   // Show loading toast
   toast(tn('loading'));
