@@ -555,7 +555,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     </form>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
-    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.0</div>
+    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.0.1</div>
   </div>
 </div>
 
@@ -654,7 +654,15 @@ async function doLogin(){
       sessionStorage.setItem('iptv_auth','1');
       document.getElementById('login-overlay').classList.add('hidden');
       err.textContent='';
-      location.reload();
+      // Start the app directly — no reload needed (avoids SW reload loop)
+      if(typeof loadData==='function'){
+        loadData();
+        setTimeout(function(){if(typeof refreshLangUI==='function')refreshLangUI();},200);
+        if(typeof setupAirPlay==='function')setupAirPlay();
+        if(typeof setupPiP==='function')setupPiP();
+      }else{
+        location.reload(); // fallback if main script broken
+      }
     }else{
       err.textContent='Wrong password (pw: free) / รหัสผิด (รหัส: free)';
       document.getElementById('loginPass').value='';
