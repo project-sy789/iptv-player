@@ -586,10 +586,10 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     <option value="-1">Auto</option>
   </select>
   <select id="audioSelect" onchange="setAudioTrack(this.value)" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:4px 8px;border-radius:4px;font-size:11px;max-width:60px"><option value="-1">🔊</option></select>
-  <button id="ccBtn" onclick="toggleSubtitle()" title="Subtitles/CC" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px">💬</button>
-  <button id="castBtn" onclick="toggleCast()" title="Cast to TV" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px">📡 แคสต์</button>
-  <button onclick="openFullscreen()">⛶ เต็มจอ</button>
-  <button class="danger" onclick="stop()">✕</button>
+  <button id="ccBtn" onclick="toggleSubtitle()" title="💬 CC" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px">💬</button>
+  <button id="castBtn" onclick="toggleCast()" title="📡 Cast" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px">📡 แคสต์</button>
+  <button id="fullBtn" onclick="openFullscreen()">⛶ เต็มจอ</button>
+  <button id="stopBtn" class="danger" onclick="stop()">✕</button>
 </div>
 
 <div id="player-overlay">
@@ -599,10 +599,10 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
       <option value="-1">Auto</option>
     </select>
     <select id="overlayAudio" onchange="setAudioTrack(this.value)" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:4px 8px;border-radius:4px;font-size:11px;max-width:60px"><option value="-1">🔊</option></select>
-    <button id="overlayCcBtn" onclick="toggleSubtitle()" title="Subtitles/CC" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px">💬</button>
-    <button id="overlayCastBtn" onclick="toggleCast()" title="Cast" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px">📡 แคสต์</button>
-    <button onclick="closeFullscreen()">⬇ ย่อ</button>
-    <button onclick="fullStop()" style="background:#e04040">✕ หยุด</button>
+    <button id="overlayCcBtn" onclick="toggleSubtitle()" title="💬 CC" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px">💬</button>
+    <button id="overlayCastBtn" onclick="toggleCast()" title="📡 Cast" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px">📡 แคสต์</button>
+    <button id="overlayCloseBtn" onclick="closeFullscreen()">⬇ ย่อ</button>
+    <button id="overlayStopBtn" onclick="fullStop()" style="background:#e04040">✕ หยุด</button>
   </div>
   <video id="video" controls autoplay></video>
 </div>
@@ -641,7 +641,7 @@ const countryName = cc => COUNTRY_NAMES[cc]||cc||'Unknown';
 var LANG=(()=>{try{return localStorage.getItem('iptv_lang')||'th'}catch(e){return'th'}})();
 function setLang(l){
   LANG=l;try{localStorage.setItem('iptv_lang',l)}catch(e){}
-  renderLangToggle();
+  refreshLangUI();
   if(ALL.length){if(currentView==='country')renderCountry(currentCountry);else goHome();}
 }
 const T={
@@ -696,6 +696,10 @@ const T={
   updated:{en:'✅ Updated!',th:'✅ อัปเดตแล้ว!'},
   updateAvail:{en:'⚠️ Update available',th:'⚠️ มีอัปเดต'},
   justNow:{en:'just now',th:'เมื่อกี้'},
+  closeFull:{en:'⬇ Minimize',th:'⬇ ย่อ'},
+  stopFull:{en:'✕ Stop',th:'✕ หยุด'},
+  ccTitle:{en:'💬 Subtitles/CC',th:'💬 คำบรรยาย'},
+  castTitle:{en:'📡 Cast to TV',th:'📡 แคสต์ไปทีวี'},
   cached:{en:'cached',th:'แคช'},
   clearRecent:{en:'🗑 Clear',th:'🗑 ล้าง'},
   audioDefault:{en:'🔊 Audio',th:'🔊 เสียง'},
@@ -716,6 +720,26 @@ function renderLangToggle(){
   if(!b)return;
   b.innerHTML=LANG==='th'?'<b>TH</b> | EN':'TH | <b>EN</b>';
 }
+function refreshLangUI(){
+  // Update all UI elements that use tn() keys
+  setText('refreshBtn',tn('refresh'));
+  setText('testBtn',tn('test'));
+  setText('logout-btn',tn('logout'));
+  setText('fullBtn',tn('fullscreen'));
+  setText('castBtn',tn('cast'));
+  setTitle('castBtn',tn('castTitle'));
+  setText('ccBtn',tn('subtitleBtn'));
+  setTitle('ccBtn',tn('ccTitle'));
+  setText('overlayCloseBtn',tn('closeFull'));
+  setText('overlayStopBtn',tn('stopFull'));
+  setText('overlayCastBtn',tn('cast'));
+  setTitle('overlayCastBtn',tn('castTitle'));
+  setText('overlayCcBtn',tn('subtitleBtn'));
+  setTitle('overlayCcBtn',tn('ccTitle'));
+  renderLangToggle();
+}
+function setText(id,text){const e=document.getElementById(id);if(e&&text)e.textContent=text;}
+function setTitle(id,text){const e=document.getElementById(id);if(e&&text)e.title=text;}
 
 // ====== M3U PARSER ======
 function parseM3U(text){
@@ -1791,6 +1815,7 @@ loadStreamStatus();
 if(isLoggedIn()){
   $('login-overlay').classList.add('hidden');
   loadData();
+  setTimeout(refreshLangUI,200);
 }
 
 // ── PWA Service Worker + อัปเดตอัตโนมัติ ──
