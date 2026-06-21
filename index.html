@@ -396,6 +396,92 @@ body{
 }
 #logout-btn:hover{color:var(--accent2);border-color:var(--accent2)}
 
+/* Hamburger menu (mobile) */
+#menu-toggle{
+  display:none;position:fixed;top:10px;left:10px;z-index:60;
+  width:40px;height:40px;border-radius:8px;
+  background:var(--surface);border:1px solid var(--border);
+  color:var(--text);font-size:20px;cursor:pointer;
+  align-items:center;justify-content:center;
+}
+#sidebar-overlay{display:none}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:1024px){
+  :root{--sidebar-w:200px}
+  #sidebar{width:200px}
+  #player-bar{left:200px}
+  .country-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .grid-view{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+  .row-wrap .row-title{font-size:16px}
+  .row-scroll .card{width:170px}
+  .row-scroll .card .poster{height:96px}
+  #topbar{padding:10px 16px}
+  #topbar .title{font-size:16px}
+}
+@media(max-width:768px){
+  :root{--sidebar-w:0}
+  #menu-toggle{display:flex}
+  #sidebar{
+    position:fixed;left:-260px;top:0;bottom:0;width:260px;
+    z-index:55;transition:left .25s;box-shadow:4px 0 20px rgba(0,0,0,.5);
+  }
+  #sidebar.open{left:0}
+  #sidebar-overlay{
+    display:none;position:fixed;inset:0;z-index:54;
+    background:rgba(0,0,0,.5);
+  }
+  #sidebar-overlay.show{display:block}
+  #main{margin-left:0}
+  #player-bar{left:0;padding:0 10px;gap:8px}
+  #player-bar.on{height:56px}
+  #player-bar .thumb{width:34px;height:34px;font-size:18px}
+  #player-bar .info .nm{font-size:12px}
+  #player-bar .info .sub{font-size:10px}
+  #player-bar button{padding:5px 10px;font-size:11px}
+  #topbar{padding:8px 12px 8px 56px;gap:8px;flex-wrap:wrap}
+  #topbar .breadcrumb{font-size:12px}
+  #topbar .stats{font-size:11px}
+  #topbar select{font-size:11px;padding:5px 8px}
+  #topbar button{font-size:11px!important;padding:5px 10px!important}
+  #search input{font-size:12px;padding:8px 10px}
+  .country-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+  .country-card{padding:14px}
+  .country-card .flag{width:44px;height:44px;font-size:24px}
+  .country-card .name{font-size:12px}
+  .country-card .count{font-size:11px}
+  .grid-view{grid-template-columns:1fr;gap:6px;padding:12px}
+  .grid-view .card{padding:10px}
+  .row-wrap{margin-bottom:20px}
+  .row-wrap .row-title{font-size:15px;padding:0 12px}
+  .row-scroll{padding:0 12px;gap:8px}
+  .row-scroll .card{width:150px}
+  .row-scroll .card .poster{height:84px}
+  .row-scroll .card .info{padding:8px 10px}
+  .row-scroll .card .info .name{font-size:12px}
+  .welcome{padding:16px}
+  .welcome h2{font-size:18px}
+  .welcome p{font-size:13px}
+  .login-box{padding:28px 20px}
+  .login-box .icon{font-size:44px}
+  .login-box h2{font-size:20px}
+  #player-overlay .topbar{padding:8px 12px}
+  #player-overlay .topbar .tname{font-size:12px}
+  #player-overlay .topbar button{font-size:11px;padding:6px 10px}
+  #sidebar nav button{font-size:12px;padding:8px 10px}
+  #sidebar .logo{font-size:17px;padding:14px 14px 10px}
+}
+@media(max-width:480px){
+  .country-grid{grid-template-columns:repeat(2,1fr);gap:6px}
+  .country-card{padding:12px}
+  .country-card .flag{width:36px;height:36px;font-size:20px}
+  .row-scroll .card{width:130px}
+  .row-scroll .card .poster{height:72px}
+  #topbar button{margin-left:0!important}
+  #logout-btn{margin-left:0!important}
+  .cc-badge{width:18px;height:18px;font-size:9px}
+}
+
 </style>
 </head>
 <body>
@@ -412,6 +498,10 @@ body{
     <div class="hint">🔒 Protected · iptv-org</div>
   </div>
 </div>
+
+<!-- Mobile menu toggle -->
+<button id="menu-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+<div id="sidebar-overlay" onclick="toggleSidebar()"></div>
 
 <aside id="sidebar">
   <div class="logo"><span class="icon">📺</span>IPTV<span class="ver">iptv-org</span></div>
@@ -594,17 +684,20 @@ function renderCountryList(){
 function goHome(){
   currentView='home';currentCountry=null;currentCategory=null;
   $('searchInput').value='';
+  closeSidebar();
   updateNavHighlight();
   renderCountryList();
   renderHome();
 }
 function goCountry(cc){
   currentView='country';currentCountry=cc;currentCategory=null;
+  closeSidebar();
   updateNavHighlight();
   renderCountryList();
   renderCountry(cc);
 }
 function goCategory(cat){
+  closeSidebar();
   currentCategory=cat;
   renderCategory(currentCountry,cat);
 }
@@ -876,6 +969,18 @@ document.addEventListener('keydown',e=>{
 });
 
 function escAttr(s){return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,"&#39;")}
+
+// ====== MOBILE SIDEBAR ======
+function toggleSidebar(){
+  $('sidebar').classList.toggle('open');
+  $('sidebar-overlay').classList.toggle('show');
+  $('menu-toggle').textContent=$('sidebar').classList.contains('open')?'✕':'☰';
+}
+function closeSidebar(){
+  $('sidebar').classList.remove('open');
+  $('sidebar-overlay').classList.remove('show');
+  $('menu-toggle').textContent='☰';
+}
 
 // ====== REFRESH ======
 async function refreshData(){
