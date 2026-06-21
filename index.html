@@ -774,7 +774,9 @@ const T={
   scKeyTitle:{en:'⌨️ Keyboard Shortcuts',th:'⌨️ คีย์ลัด / รีโมท'},
   updateDone:{en:'✅ Updated! Tap to refresh',th:'✅ อัปเดตเรียบร้อย! แตะเพื่อรีเฟรช'},
   updateAvailBanner:{en:'🔄 New version! Update now',th:'🔄 มีเวอร์ชันใหม่! อัปเดตเลย'},
-  updatePending:{en:'⏳ Updating…',th:'⏳ กำลังอัปเดต…'}
+  updatePending:{en:'⏳ Updating…',th:'⏳ กำลังอัปเดต…'},
+  prevChannel:{en:'Previous',th:'ช่องก่อน'},
+  nextChannel:{en:'Next',th:'ช่องถัดไป'}
 };
 const tn = (key, ...args) => {
   const v = T[key];
@@ -2122,6 +2124,7 @@ if(isLoggedIn()){
   loadData();
   setTimeout(refreshLangUI,200);
   setupAirPlay();
+  setupPiP();
 }
 
 
