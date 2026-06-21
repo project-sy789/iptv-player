@@ -571,7 +571,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     </form>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
-    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.5.0</div>
+    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.6.0</div>
   </div>
 </div>
 
@@ -707,9 +707,12 @@ var currentCategory = null;
 var filterTimer = null;
 var _dataLoaded = false;
 
-const CACHE_KEY = 'iptv_full_v3';
-const CACHE_TS = 'iptv_ts_v3';
+const CACHE_KEY = 'iptv_full_v4';
+const CACHE_TS = 'iptv_ts_v4';
 const M3U_URL = 'https://iptv-org.github.io/iptv/index.m3u';
+const FREE_TV_URL = 'https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8';
+const FREE_TV_CACHE = 'iptv_freetv_v1';
+const FREE_TV_TS = 'iptv_freetv_ts_v1';
 const CACHE_TTL = 6 * 3600 * 1000;
 
 // ====== HELPERS ======
@@ -925,7 +928,32 @@ function extractInfo(e){
     geo:/\[Geo-blocked\]/i.test(x),
     not247:/\[Not 24\/7\]/i.test(x),
     tvgId:tm?tm[1]:null,
-    url:e.url
+    url:e.url,
+    _src:'iptv-org'
+  };
+}
+
+// Free-TV/IPTV parser (different format: tvg-country, group-title=country name)
+function extractInfoFreeTV(e){
+  const x=e.extinf;
+  // Strip suffix markers like Ⓢ Ⓣ Ⓨ
+  const nm=x.match(/,([^,\[\n]+?)(?:\s*[ⓈⓉⓎ])?\s*$/);
+  const qm=x.match(/\((\d+p)\)/);
+  const gm=x.match(/group-title="([^"]+)"/);
+  const cm=x.match(/tvg-country="([A-Z]{2})"/);  // Free-TV uses tvg-country directly
+  const tm=x.match(/tvg-id="([^"]+)"/);
+  const lm=x.match(/tvg-logo="([^"]+)"/);
+  return{
+    name:nm?nm[1].trim():'Unknown',
+    quality:qm?qm[1]:null,
+    cat:gm?gm[1]:'Other',
+    country:cm?cm[1].toUpperCase():null,
+    logo:lm?lm[1]:null,
+    geo:/\[Geo-blocked\]/i.test(x),
+    not247:/\[Not 24\/7\]/i.test(x),
+    tvgId:tm?tm[1]:null,
+    url:e.url,
+    _src:'free-tv'
   };
 }
 
@@ -933,32 +961,86 @@ function extractInfo(e){
 async function loadData(){
   if(_dataLoaded)return;
   _dataLoaded=true;
-  let raw=null;
+
+  // ── Load iptv-org (primary) ──
+  let raw1=null;
   try{
     const c=localStorage.getItem(CACHE_KEY),t=localStorage.getItem(CACHE_TS);
-    if(c&&t&&Date.now()-parseInt(t)<CACHE_TTL){raw=c;$('lastUpdate').textContent='cached '+new Date(parseInt(t)).toLocaleTimeString()}
+    if(c&&t&&Date.now()-parseInt(t)<CACHE_TTL){raw1=c;$('lastUpdate').textContent='cached '+new Date(parseInt(t)).toLocaleTimeString()}
   }catch(e){}
-  if(!raw){
-    $('content').innerHTML='<div class="loading"><span class="emoji">📡</span>'+tn('downloading')+'</div>';
+  if(!raw1){
+    $('content').innerHTML='<div class="loading"><span class="emoji">📡</span>Loading iptv-org…</div>';
     try{
       const r=await fetch(M3U_URL);
       if(!r.ok)throw new Error('HTTP '+r.status);
-      raw=await r.text();
-      try{localStorage.setItem(CACHE_KEY,raw);localStorage.setItem(CACHE_TS,Date.now().toString())}catch(e){}
+      raw1=await r.text();
+      try{localStorage.setItem(CACHE_KEY,raw1);localStorage.setItem(CACHE_TS,Date.now().toString())}catch(e){}
       $('lastUpdate').textContent='just now';
-      $('updateTime').textContent='just now';
     }catch(e){
       $('content').innerHTML='<div class="loading"><span class="emoji">❌</span>Failed: '+esc(e.message)+'</div>';
       return;
     }
   }
+
+  // ── Load Free-TV (secondary) ──
+  let raw2=null;
+  try{
+    const c2=localStorage.getItem(FREE_TV_CACHE),t2=localStorage.getItem(FREE_TV_TS);
+    if(c2&&t2&&Date.now()-parseInt(t2)<CACHE_TTL){raw2=c2;}
+  }catch(e){}
+  if(!raw2){
+    try{
+      const r2=await fetch(FREE_TV_URL);
+      if(r2.ok){
+        raw2=await r2.text();
+        try{localStorage.setItem(FREE_TV_CACHE,raw2);localStorage.setItem(FREE_TV_TS,Date.now().toString())}catch(e){}
+      }
+    }catch(e){/* Free-TV optional — don't block on failure */}
+  }
+
   $('content').innerHTML='<div class="loading"><span class="emoji">⚙️</span>'+tn('parsing')+'</div>';
   await sleep(10);
-  
-  const entries=parseM3U(raw);
-  ALL=entries.map(extractInfo);
+
+  // ── Parse iptv-org ──
+  const entries1=parseM3U(raw1);
+  const ch1=entries1.map(extractInfo);
+
+  // ── Parse Free-TV ──
+  let ch2=[];
+  if(raw2){
+    const entries2=parseM3U(raw2);
+    ch2=entries2.map(extractInfoFreeTV);
+  }
+
+  // ── Merge: deduplicate by URL, prefer Free-TV metadata when present ──
+  const seen=new Map(); // url → channel
+  for(const ch of ch1){
+    if(ch.url)seen.set(ch.url,ch);
+  }
+  let newFromFT=0, upgraded=0;
+  for(const ch of ch2){
+    if(!ch.url)continue;
+    const existing=seen.get(ch.url);
+    if(existing){
+      // Upgrade metadata if Free-TV has better info
+      let better=false;
+      if(ch.logo&&!existing.logo){existing.logo=ch.logo;better=true;}
+      if(ch.tvgId&&!existing.tvgId){existing.tvgId=ch.tvgId;better=true;}
+      if(ch.country&&!existing.country){existing.country=ch.country;better=true;}
+      if(better)upgraded++;
+    }else{
+      // New channel from Free-TV
+      seen.set(ch.url,ch);
+      newFromFT++;
+    }
+  }
+  ALL=Array.from(seen.values());
+
   buildDB();
   goHome();
+  if(newFromFT||upgraded){
+    setTimeout(()=>toast('🆕 +'+newFromFT+' new, ✨ '+upgraded+' upgraded from Free-TV'),1500);
+  }
 }
 function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
 
@@ -1802,21 +1884,49 @@ function closeSidebar(){
 // ====== REFRESH ======
 async function refreshData(){
   $('chCount').textContent='Refreshing...';
-  toast('🔄 Fetching latest from iptv-org...');
+  toast('🔄 Fetching latest from iptv-org + Free-TV...');
   try{
-    const r=await fetch(M3U_URL,{cache:'no-cache'});
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    const raw=await r.text();
-    localStorage.setItem(CACHE_KEY,raw);
+    // Refresh iptv-org
+    const r1=await fetch(M3U_URL,{cache:'no-cache'});
+    if(!r1.ok)throw new Error('HTTP '+r1.status);
+    const raw1=await r1.text();
+    localStorage.setItem(CACHE_KEY,raw1);
     localStorage.setItem(CACHE_TS,Date.now().toString());
-    const entries=parseM3U(raw);
-    ALL=entries.map(extractInfo);
+
+    // Refresh Free-TV
+    let raw2=null;
+    try{
+      const r2=await fetch(FREE_TV_URL,{cache:'no-cache'});
+      if(r2.ok){
+        raw2=await r2.text();
+        localStorage.setItem(FREE_TV_CACHE,raw2);
+        localStorage.setItem(FREE_TV_TS,Date.now().toString());
+      }
+    }catch(e){}
+
+    // Parse & merge
+    const ch1=parseM3U(raw1).map(extractInfo);
+    const ch2=raw2?parseM3U(raw2).map(extractInfoFreeTV):[];
+    const seen=new Map();
+    for(const ch of ch1){if(ch.url)seen.set(ch.url,ch);}
+    let newFromFT=0;
+    for(const ch of ch2){
+      if(!ch.url)continue;
+      const ex=seen.get(ch.url);
+      if(ex){
+        if(ch.logo&&!ex.logo)ex.logo=ch.logo;
+        if(ch.tvgId&&!ex.tvgId)ex.tvgId=ch.tvgId;
+        if(ch.country&&!ex.country)ex.country=ch.country;
+      }else{seen.set(ch.url,ch);newFromFT++;}
+    }
+    ALL=Array.from(seen.values());
     buildDB();
     $('lastUpdate').textContent=tn('updated');
     $('updateTime').textContent=tn('justNow');
     if(currentView==='country')renderCountry(currentCountry);
     else goHome();
-    toast('✅ Updated! '+ALL.length.toLocaleString()+' channels');
+    const msg='✅ Updated! '+ALL.length.toLocaleString()+' channels';
+    toast(newFromFT?msg+' (+'+newFromFT+' from Free-TV)':msg);
   }catch(e){
     toast('❌ Refresh failed: '+e.message);
   }
@@ -1829,6 +1939,18 @@ setInterval(async ()=>{
     if(lm){
       const cachedTs=localStorage.getItem(CACHE_TS);
       if(cachedTs&&new Date(lm).getTime()>parseInt(cachedTs)){
+        $('lastUpdate').textContent='⚠️ Update available';
+        $('updateTime').textContent='⚠️ new';
+      }
+    }
+  }catch(e){}
+  // Also check Free-TV
+  try{
+    const r2=await fetch(FREE_TV_URL,{method:'HEAD',cache:'no-cache'});
+    const lm2=r2.headers.get('last-modified');
+    if(lm2){
+      const cachedTs2=localStorage.getItem(FREE_TV_TS);
+      if(cachedTs2&&new Date(lm2).getTime()>parseInt(cachedTs2)){
         $('lastUpdate').textContent='⚠️ Update available';
         $('updateTime').textContent='⚠️ new';
       }
