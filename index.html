@@ -1074,7 +1074,7 @@ function isLoggedIn(){return sessionStorage.getItem('iptv_auth')==='1'}
 async function doLogin(){
   const pass=$('loginPass').value;
   if(!pass){$('loginError').textContent='Enter password';return}
-  const hash=await sha256('iptv2026_'+pass);
+  const hash=await sha256(pass);
   if(hash===PASS_HASH){
     sessionStorage.setItem('iptv_auth','1');
     $('login-overlay').classList.add('hidden');
