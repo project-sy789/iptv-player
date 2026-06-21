@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>📺 IPTV — iptv-org</title>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
 <style>
 :root {
   --bg: #0c0c14;
@@ -179,6 +180,16 @@ body{
   border-color:var(--accent);
   transform:translateY(-3px);
   box-shadow:0 8px 25px rgba(0,0,0,.4);
+}
+.row-scroll .card:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;
+  border-color:var(--accent);
+  transform:translateY(-3px);
+  box-shadow:0 8px 25px rgba(0,0,0,.4),0 0 0 4px rgba(240,160,48,.3);
+}
+.row-scroll .card:focus-visible.playing{
+  outline-color:var(--live);
+  box-shadow:0 0 0 2px var(--live),0 0 0 6px rgba(48,200,96,.3);
 }
 .row-scroll .card.playing{border-color:var(--live);box-shadow:0 0 0 2px var(--live)}
 .row-scroll .card .poster{
@@ -547,6 +558,7 @@ body{
   <select id="qualitySelect" onchange="setQuality(this.value)" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:4px 8px;border-radius:4px;font-size:11px;max-width:90px">
     <option value="-1">Auto</option>
   </select>
+  <button id="castBtn" onclick="toggleCast()" title="Cast to TV" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px">📡 Cast</button>
   <button onclick="openFullscreen()">⛶ Full</button>
   <button class="danger" onclick="stop()">✕</button>
 </div>
@@ -557,6 +569,7 @@ body{
     <select id="overlayQuality" onchange="setQuality(this.value)" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:4px 8px;border-radius:4px;font-size:11px;max-width:90px">
       <option value="-1">Auto</option>
     </select>
+    <button id="overlayCastBtn" onclick="toggleCast()" title="Cast" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px">📡 Cast</button>
     <button onclick="closeFullscreen()">⬇ Minimize</button>
     <button onclick="fullStop()" style="background:#e04040">✕ Stop</button>
   </div>
@@ -820,7 +833,7 @@ function renderCategory(cc,cat){
     const qlClass=(!ch.quality||parseInt(ch.quality)<720)?'sd':'';
     const idx=ALL.indexOf(ch);
     
-    html+=`<div class="${cls}" onclick="play(${idx})">
+    html+=`<div class="${cls}" onclick="play(${idx})" tabindex="0" onkeydown="if(event.key==='Enter')play(${idx})">
       <div class="thumb">${flag||'📺'}</div>
       <div class="detail">
         <div class="nm">${esc(ch.name)}</div>
@@ -881,7 +894,7 @@ function renderRow(title,subtitle,channels){
     const idx=ALL.indexOf(ch);
     const logoHtml=ch.logo?`<img src="${esc(ch.logo)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt=""><div class="poster-cc" style="display:none"><span>${ch.country||'??'}</span></div>`:`<div class="poster-cc"><span>${ch.country||'??'}</span></div>`;
     
-    h+=`<div class="${cls}" onclick="play(${idx})">
+    h+=`<div class="${cls}" onclick="play(${idx})" tabindex="0" onkeydown="if(event.key==='Enter')play(${idx})">
       <div class="poster">
         ${ch.geo?'<div class="live-dot" style="background:#e04040;box-shadow:0 0 6px #e04040"></div>':''}
         ${logoHtml}
@@ -934,21 +947,41 @@ function initPlayer(ch){
   video.src='';
   resetQualityUI();
   
+  // Show loading toast
+  toast('⏳ Loading...');
+  
+  if(!ch.url){
+    toast('❌ No stream URL');
+    return;
+  }
+  
   if(Hls.isSupported()){
     hls=new Hls({enableWorker:false,lowLatencyMode:false});
     hls.loadSource(ch.url);
     hls.attachMedia(video);
     hls.on(Hls.Events.MANIFEST_PARSED,(ev,data)=>{
       buildQualityUI(hls.levels);
-      video.play().catch(()=>{});
+      video.play().then(()=>toast('▶ Playing'))
+        .catch(()=>toast('⚠️ Tap to start'));
     });
     hls.on(Hls.Events.ERROR,(ev,data)=>{
-      if(data.fatal){console.error('HLS',data.type);hls.destroy();hls=null;video.src=ch.url;video.play().catch(()=>{})}
+      console.warn('HLS error:',data.type,data.details);
+      if(data.fatal){
+        hls.destroy();hls=null;
+        // Try direct play as fallback
+        video.src=ch.url;
+        video.play().catch(()=>{
+          toast('❌ Stream unavailable — try another channel');
+          stop();
+        });
+      }
     });
   }else if(video.canPlayType('application/vnd.apple.mpegurl')){
-    video.src=ch.url;video.play().catch(()=>{});
+    video.src=ch.url;
+    video.play().catch(()=>toast('⚠️ Tap to start'));
   }else{
-    video.src=ch.url;video.play().catch(()=>{});
+    video.src=ch.url;
+    video.play().catch(()=>toast('⚠️ Tap to start'));
   }
 }
 
@@ -983,6 +1016,7 @@ function setQuality(val){
   }
 }
 function stop(){
+  if(castSession){castSession.endSession(true);castSession=null;updateCastUI()}
   if(hls){hls.destroy();hls=null}
   $('video').src='';
   currentChannel=null;
@@ -1007,9 +1041,30 @@ function toast(msg){
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
     if($('player-overlay').classList.contains('on'))closeFullscreen();
-    else stop();
+    else if(currentChannel)stop();
   }
   if(e.ctrlKey&&e.key==='f'){$('searchInput').focus();e.preventDefault()}
+  // D-pad / remote navigation
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter'].includes(e.key)){
+    const cards=document.querySelectorAll('.card[tabindex="0"]');
+    if(!cards.length)return;
+    const focused=document.activeElement;
+    const idx=Array.from(cards).indexOf(focused);
+    if(idx===-1&&e.key!=='Enter'){cards[0].focus();e.preventDefault();return}
+    const cols=getComputedStyle(document.getElementById('grid')||cards[0].parentElement).gridTemplateColumns.split(' ').length||3;
+    let next=idx;
+    if(e.key==='ArrowRight')next=Math.min(idx+1,cards.length-1);
+    else if(e.key==='ArrowLeft')next=Math.max(idx-1,0);
+    else if(e.key==='ArrowDown')next=Math.min(idx+cols,cards.length-1);
+    else if(e.key==='ArrowUp')next=Math.max(idx-cols,0);
+    else if(e.key==='Enter'){
+      // Simulate click on focused card
+      if(focused&&focused.classList.contains('card'))focused.click();
+      return;
+    }
+    if(next!==idx){cards[next].focus();cards[next].scrollIntoView({block:'nearest'});}
+    e.preventDefault();
+  }
 });
 
 function escAttr(s){return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,"&#39;")}
@@ -1062,6 +1117,64 @@ setInterval(async ()=>{
     }
   }catch(e){}
 },2*3600*1000);
+
+// ====== CHROMECAST ======
+var castSession=null;
+window['__onGCastApiAvailable']=function(isAvailable){
+  if(!isAvailable)return;
+  const ctx=cast.framework.CastContext.getInstance();
+  ctx.setOptions({
+    receiverApplicationId:cast.framework.ReceiverApplicationId.DEFAULT_MEDIA_RECEIVER,
+    autoJoinPolicy:chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
+  });
+  ctx.addEventListener(cast.framework.CastContextEventType.SESSION_STATE_CHANGED,e=>{
+    castSession=e.session;
+    updateCastUI();
+    if(!castSession&&currentChannel){
+      // Disconnected from cast, resume local playback
+      initPlayer(currentChannel);
+    }
+  });
+  // Show cast buttons
+  $('castBtn').style.display='inline-block';
+  $('overlayCastBtn').style.display='inline-block';
+};
+
+function updateCastUI(){
+  const active=!!castSession;
+  ['castBtn','overlayCastBtn'].forEach(id=>{
+    const b=$(id);if(!b)return;
+    b.textContent=active?'📡 Connected':'📡 Cast';
+    b.style.background=active?'var(--live)':'';
+    b.style.color=active?'#000':'';
+  });
+}
+
+async function toggleCast(){
+  const ctx=cast.framework.CastContext.getInstance();
+  if(castSession){
+    ctx.endCurrentSession(true);
+    castSession=null;
+    updateCastUI();
+  }else if(currentChannel){
+    try{
+      await ctx.requestSession();
+      const session=ctx.getCurrentSession();
+      if(session&&currentChannel){
+        const mediaInfo=new chrome.cast.media.MediaInfo(currentChannel.url,'application/x-mpegURL');
+        mediaInfo.metadata=new chrome.cast.media.GenericMediaMetadata();
+        mediaInfo.metadata.title=currentChannel.name;
+        mediaInfo.metadata.subtitle=currentChannel.cat;
+        const req=new chrome.cast.media.LoadRequest(mediaInfo);
+        req.autoplay=true;
+        await session.loadMedia(req);
+        castSession=session;
+        updateCastUI();
+        toast('📡 Casting to TV');
+      }
+    }catch(e){toast('❌ Cast failed')}
+  }
+}
 
 // ====== LOGIN ======
 const PASS_HASH='ad95d5fa651ba86d8923fe1238d24a4f1988a752acfe426ac72ac7c04471bc17';
