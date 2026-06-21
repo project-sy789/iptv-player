@@ -323,6 +323,8 @@ body{
 #player-bar button:hover{background:var(--border)}
 #player-bar button.danger{background:var(--accent2);border-color:var(--accent2);color:#fff}
 #player-bar button.danger:hover{opacity:.85}
+#qualitySelect{max-width:70px!important;font-size:10px!important}
+#overlayQuality{max-width:70px!important;font-size:10px!important}
 
 /* Fullscreen player */
 #player-overlay{
@@ -542,13 +544,19 @@ body{
     <div class="nm" id="barName">—</div>
     <div class="sub" id="barSub">—</div>
   </div>
-  <button onclick="openFullscreen()">⛶ Fullscreen</button>
-  <button class="danger" onclick="stop()">✕ Stop</button>
+  <select id="qualitySelect" onchange="setQuality(this.value)" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:4px 8px;border-radius:4px;font-size:11px;max-width:90px">
+    <option value="-1">Auto</option>
+  </select>
+  <button onclick="openFullscreen()">⛶ Full</button>
+  <button class="danger" onclick="stop()">✕</button>
 </div>
 
 <div id="player-overlay">
   <div class="topbar">
     <span class="tname" id="overlayName">—</span>
+    <select id="overlayQuality" onchange="setQuality(this.value)" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:4px 8px;border-radius:4px;font-size:11px;max-width:90px">
+      <option value="-1">Auto</option>
+    </select>
     <button onclick="closeFullscreen()">⬇ Minimize</button>
     <button onclick="fullStop()" style="background:#e04040">✕ Stop</button>
   </div>
@@ -924,12 +932,16 @@ function initPlayer(ch){
   const video=$('video');
   if(hls){hls.destroy();hls=null}
   video.src='';
+  resetQualityUI();
   
   if(Hls.isSupported()){
     hls=new Hls({enableWorker:false,lowLatencyMode:false});
     hls.loadSource(ch.url);
     hls.attachMedia(video);
-    hls.on(Hls.Events.MANIFEST_PARSED,()=>video.play().catch(()=>{}));
+    hls.on(Hls.Events.MANIFEST_PARSED,(ev,data)=>{
+      buildQualityUI(hls.levels);
+      video.play().catch(()=>{});
+    });
     hls.on(Hls.Events.ERROR,(ev,data)=>{
       if(data.fatal){console.error('HLS',data.type);hls.destroy();hls=null;video.src=ch.url;video.play().catch(()=>{})}
     });
@@ -939,10 +951,42 @@ function initPlayer(ch){
     video.src=ch.url;video.play().catch(()=>{});
   }
 }
+
+function resetQualityUI(){
+  ['qualitySelect','overlayQuality'].forEach(id=>{
+    const s=$(id);s.style.display='none';s.innerHTML='<option value="-1">Auto</option>';
+  });
+}
+function buildQualityUI(levels){
+  if(!levels||levels.length<2)return;
+  let opts='<option value="-1">Auto</option>';
+  const seen=new Set();
+  levels.forEach((l,i)=>{
+    const label=(l.height?l.height+'p':(l.bitrate?Math.round(l.bitrate/1000)+'k':'Lv'+i));
+    if(!seen.has(label)){seen.add(label);opts+=`<option value="${i}">${label}</option>`}
+  });
+  ['qualitySelect','overlayQuality'].forEach(id=>{
+    const s=$(id);s.innerHTML=opts;s.style.display='inline-block';
+  });
+}
+function setQuality(val){
+  if(!hls)return;
+  hls.nextLevel=parseInt(val);
+  ['qualitySelect','overlayQuality'].forEach(id=>{
+    const s=$(id);if(s)s.value=val;
+  });
+  // Update player bar sub to show current quality
+  if(currentChannel){
+    const lvl=hls.levels[hls.currentLevel];
+    const qlabel=val=='-1'?'Auto':(lvl&&lvl.height?lvl.height+'p':(lvl?Math.round(lvl.bitrate/1000)+'k':''));
+    $('barSub').textContent=(qlabel?qlabel+' · ':'')+currentChannel.cat+' · '+(currentChannel.country?countryName(currentChannel.country):'??');
+  }
+}
 function stop(){
   if(hls){hls.destroy();hls=null}
   $('video').src='';
   currentChannel=null;
+  resetQualityUI();
   $('player-bar').classList.remove('on');
   $('player-overlay').classList.remove('on');
   document.querySelectorAll('.card.playing').forEach(c=>c.classList.remove('playing'));
