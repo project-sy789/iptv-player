@@ -571,7 +571,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     </form>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
-    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.3.4</div>
+    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.4.0</div>
   </div>
 </div>
 
@@ -1261,13 +1261,17 @@ function getTopCategories(n){
 }
 
 // ====== RENDER: COUNTRY ======
+var _countryCats=[],_countryCc='',_catsShown=6;
 function renderCountry(cc){
   const data=DB[cc];
   if(!data){goHome();return;}
+  _countryCc=cc;
+  _catsShown=6;
   
   $('breadcrumb').innerHTML='<span onclick="goHome()">🏠 Home</span><span class="sep">›</span><span>'+data.flag+' '+countryName(cc)+'</span>';
   
   const cats=Object.entries(data.categories).sort((a,b)=>b[1].length-a[1].length);
+  _countryCats=cats;
   const total=cats.reduce((s,[,chs])=>s+chs.length,0);
   $('chCount').textContent=total.toLocaleString()+' channels in '+countryName(cc);
   
@@ -1286,12 +1290,29 @@ function renderCountry(cc){
   }
   html+='</div></div>';
   
-  // Show first few categories as rows
-  for(const [cat,chs] of cats.slice(0,6)){
-    html+=renderRow(cat,chs.length+' channels',chs.slice(0,30));
-  }
-  
+  // Show first batch of category rows
+  html+=_renderCountryRows();
   $('content').innerHTML=html;
+  setTimeout(autoTestVisible,500);
+}
+function _renderCountryRows(){
+  let h='';
+  const batch=_countryCats.slice(_catsShown-6,_catsShown);
+  for(const [cat,chs] of batch){
+    h+=renderRow(cat,chs.length+' channels',chs.slice(0,30));
+  }
+  if(_catsShown<_countryCats.length){
+    const remaining=_countryCats.length-_catsShown;
+    h+='<div style="text-align:center;padding:20px"><button onclick="loadMoreCountryCats()" style="background:var(--surface2);color:var(--accent);border:1px solid var(--border);padding:10px 28px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600">📂 Load '+Math.min(6,remaining)+' more categories ('+remaining+' remaining)</button></div>';
+  }
+  return h;
+}
+function loadMoreCountryCats(){
+  _catsShown+=6;
+  const btn=document.querySelector('#content button');
+  if(btn)btn.remove();
+  const more=_renderCountryRows();
+  document.getElementById('content').insertAdjacentHTML('beforeend',more);
   setTimeout(autoTestVisible,500);
 }
 
