@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>📺 IPTV Player</title>
-<meta name="description" content="ดูทีวีสด 12,000+ ช่อง — รองรับ Chromecast, ซับไตเติ้ล, เลือกความชัด">
+<meta name="description" content="Watch 12,000+ live TV channels — Chromecast, subtitles, multi-quality | ดูทีวีสด 12,000+ ช่อง">
 <meta name="theme-color" content="#0c0c14">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -758,6 +758,23 @@ const T={
   epgNow:{en:'📅 Now',th:'📅 ตอนนี้'},
   epgNext:{en:'▶ Next',th:'▶ ถัดไป'},
   okClose:{en:'OK / Close',th:'ตกลง / ปิด'},
+  scKeyHelp:{en:'Show shortcuts panel',th:'แสดงแผงคีย์ลัด'},
+  scKeySearch:{en:'Search channels',th:'ค้นหาช่อง'},
+  scKeyFull:{en:'Fullscreen',th:'เต็มจอ'},
+  scKeyEsc:{en:'Close / Stop',th:'ปิดเต็มจอ / หยุด'},
+  scKeyNav:{en:'Navigate (D-pad)',th:'นำทาง (รีโมท)'},
+  scKeyPlay:{en:'Play channel',th:'เล่นช่อง'},
+  scKeySpace:{en:'Play / Pause',th:'เล่น / หยุด'},
+  scKeyCast:{en:'Cast / AirPlay',th:'แคสต์ / AirPlay'},
+  scKeySub:{en:'Toggle subtitles',th:'เปิด/ปิดซับ'},
+  scKeyPiP:{en:'Picture-in-Picture',th:'รูปภาพซ้อนรูปภาพ'},
+  scKeyFav:{en:'Toggle favorite',th:'เปิด/ปิดช่องโปรด'},
+  scKeyDpad:{en:'🎮 Android TV / Remote: D-pad + OK + Back',th:'🎮 กล่อง Android TV / รีโมท: ปุ่มทิศทาง + OK + Back'},
+  scKeyClose:{en:'OK / Close',th:'ตกลง / ปิด'},
+  scKeyTitle:{en:'⌨️ Keyboard Shortcuts',th:'⌨️ คีย์ลัด / รีโมท'},
+  updateDone:{en:'✅ Updated! Tap to refresh',th:'✅ อัปเดตเรียบร้อย! แตะเพื่อรีเฟรช'},
+  updateAvailBanner:{en:'🔄 New version! Update now',th:'🔄 มีเวอร์ชันใหม่! อัปเดตเลย'},
+  updatePending:{en:'⏳ Updating…',th:'⏳ กำลังอัปเดต…'}
 };
 const tn = (key, ...args) => {
   const v = T[key];
@@ -818,7 +835,7 @@ function extractInfo(e){
   const nm=x.match(/,([^,\[\n]+?)(?:\s*\[.*?\])?\s*$/);
   const qm=x.match(/\((\d+p)\)/);
   const gm=x.match(/group-title="([^"]+)"/);
-  const cm=x.match(/tvg-id="[^"]*\.([a-z]{2})@/);
+  const cm=x.match(/tvg-id="[^"]*\.([a-z]{2})@/);const tm=x.match(/tvg-id="([^"]+)"/);
   const lm=x.match(/tvg-logo="([^"]+)"/);
   return{
     name:nm?nm[1].trim():'Unknown',
@@ -828,6 +845,7 @@ function extractInfo(e){
     logo:lm?lm[1]:null,
     geo:/\[Geo-blocked\]/i.test(x),
     not247:/\[Not 24\/7\]/i.test(x),
+    tvgId:tm?tm[1]:null,
     url:e.url
   };
 }
@@ -1409,7 +1427,7 @@ function initPlayer(ch){
         .catch(()=>toast(tn('tapStart')));
     });
     hls.on(Hls.Events.ERROR,(ev,data)=>{
-      console.warn('HLS error:',data.type,data.details);
+      // HLS error handled silently
       if(data.fatal){
         hls.destroy();hls=null;
         // Mark as dead
@@ -1596,26 +1614,13 @@ function showShortcuts(){
   refreshShortcutsLang();
 }
 function refreshShortcutsLang(){
-  const map={
-    'scHelp':{en:'Show shortcuts panel',th:'แสดงแผงคีย์ลัด'},
-    'scSearch':{en:'Search channels',th:'ค้นหาช่อง'},
-    'scFullscreen':{en:'Fullscreen',th:'เต็มจอ'},
-    'scEsc':{en:'Close fullscreen / Stop',th:'ปิดเต็มจอ / หยุด'},
-    'scArrows':{en:'Navigate (D-pad)',th:'นำทาง (รีโมท)'},
-    'scEnter':{en:'Play channel',th:'เล่นช่อง'},
-    'scSpace':{en:'Play / Pause',th:'เล่น / หยุด'},
-    'scCast':{en:'Cast / AirPlay',th:'แคสต์ / AirPlay'},
-    'scSubtitle':{en:'Toggle subtitles',th:'เปิด/ปิดซับ'},
-    'scPiP':{en:'Picture-in-Picture',th:'รูปภาพซ้อนรูปภาพ'},
-    'scFav':{en:'Toggle favorite',th:'เปิด/ปิดช่องโปรด'},
-    'scDpad':{en:'🎮 Android TV / Remote: use direction + OK + Back',th:'🎮 กล่อง Android TV / รีโมท: ใช้ปุ่มทิศทาง + OK + Back'},
-    'scClose':{en:'OK / Close',th:'ตกลง / ปิด'},
-  };
-  for(const [id,texts] of Object.entries(map)){
-    const el=document.getElementById(id);
-    if(el)el.textContent=texts[LANG]||texts.en;
+  var m={'scHelp':'scKeyHelp','scSearch':'scKeySearch','scFullscreen':'scKeyFull','scEsc':'scKeyEsc','scArrows':'scKeyNav','scEnter':'scKeyPlay','scSpace':'scKeySpace','scCast':'scKeyCast','scSubtitle':'scKeySub','scPiP':'scKeyPiP','scFav':'scKeyFav','scDpad':'scKeyDpad','scClose':'scKeyClose','scCloseBtn':'scKeyClose',};
+  for(var id in m){
+    var el=document.getElementById(id);
+    if(el)el.textContent=tn(m[id]);
   }
-  document.getElementById('shortcutsTitle').textContent=LANG==='th'?'⌨️ คีย์ลัด / รีโมท':'⌨️ Keyboard Shortcuts / Remote';
+  var t=document.getElementById('shortcutsTitle');
+  if(t)t.textContent=tn('scKeyTitle');
 }
 
 document.addEventListener('keydown',e=>{
@@ -2039,8 +2044,14 @@ async function fetchEpg(ch){
   }
   // Try fetching channel guide from iptv-org
   try{
-    const tvgId=ch.name.replace(/\s+/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
-    const r=await fetch(`https://iptv-org.github.io/iptv/guides/en/${tvgId}.xml`,{signal:AbortSignal.timeout(5000)});
+    // Try tvg-id from extinf first, fallback to slugified name
+  var tvgId='';
+  if(ch._tvgId){tvgId=ch._tvgId;}
+  else{
+    // Build from name
+    tvgId=ch.name.replace(/\s+/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  };
+    const r=await fetch(`https://iptv-org.github.io/epg/guides/en/${tvgId}.xml`,{signal:AbortSignal.timeout(4000)}).catch(()=>fetch(`https://iptv-org.github.io/iptv/guides/en/${tvgId}.xml`,{signal:AbortSignal.timeout(4000)}));
     if(!r.ok)return;
     const xml=await r.text();
     const programs=parseEpgXml(xml,ch.name);
@@ -2107,6 +2118,34 @@ if(isLoggedIn()){
   setupAirPlay();
 }
 
+
+// ── Swipe Gestures (mobile/iPad) ──
+(function(){
+  if(!isMobile())return;
+  var touchStartX=0,touchStartY=0;
+  var overlay=$('player-overlay');
+  document.addEventListener('touchstart',function(e){
+    if(e.touches.length!==1)return;
+    touchStartX=e.touches[0].clientX;
+    touchStartY=e.touches[0].clientY;
+  },{passive:true});
+  document.addEventListener('touchend',function(e){
+    if(!overlay.classList.contains('on'))return;
+    var dx=(e.changedTouches[0]||{}).clientX-touchStartX;
+    var dy=(e.changedTouches[0]||{}).clientY-touchStartY;
+    // Only horizontal swipes (>50px horizontal, <30px vertical)
+    if(Math.abs(dx)<50||Math.abs(dy)>30)return;
+    // Swipe left → next channel, Swipe right → previous
+    var currentIdx=ALL.indexOf(currentChannel);
+    if(currentIdx===-1)return;
+    var nextIdx=dx>0?Math.max(0,currentIdx-1):Math.min(ALL.length-1,currentIdx+1);
+    if(nextIdx!==currentIdx&&ALL[nextIdx]&&ALL[nextIdx].url){
+      toast(dx>0?'⬅ '+tn('prevChannel'):tn('nextChannel')+' ➡');
+      play(nextIdx);
+    }
+  },{passive:true});
+})();
+
 // ── PWA Service Worker + อัปเดตอัตโนมัติ ──
 if('serviceWorker' in navigator){
   let refreshing=false;
@@ -2116,7 +2155,7 @@ if('serviceWorker' in navigator){
     // แจ้งผู้ใช้ก่อน reload
     const banner=document.createElement('div');
     banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#f0a030;color:#000;padding:14px 20px;text-align:center;font-weight:700;font-size:14px;cursor:pointer;animation:slideDown .3s ease';
-    banner.textContent='✅ อัปเดตเรียบร้อย! แตะเพื่อรีเฟรช / Tap to refresh';
+    banner.textContent=tn('updateDone');
     banner.onclick=()=>window.location.reload();
     document.body.prepend(banner);
     setTimeout(()=>{
@@ -2136,9 +2175,9 @@ if('serviceWorker' in navigator){
           // New version available — แจ้งเตือน
           const banner=document.createElement('div');
           banner.style.cssText='position:fixed;bottom:70px;left:50%;transform:translateX(-50%);z-index:99999;background:var(--surface2);color:var(--accent);padding:12px 20px;border-radius:8px;text-align:center;font-weight:600;font-size:13px;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.5);border:1px solid var(--accent);animation:slideUp .3s ease';
-          banner.textContent='🔄 มีเวอร์ชันใหม่! อัปเดตเลย / New version — Update now';
+          banner.textContent=tn('updateAvailBanner');
           banner.onclick=()=>{
-            banner.textContent='⏳ กำลังอัปเดต...';
+            banner.textContent=tn('updatePending');
             banner.onclick=null;
             newWorker.postMessage('SKIP_WAITING');
           };
@@ -2166,22 +2205,22 @@ document.head.appendChild(style);
 
 <div id="shortcuts-modal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.85);justify-content:center;align-items:center;flex-direction:column" onclick="this.style.display='none'">
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;max-width:460px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.6)" onclick="event.stopPropagation()">
-    <h2 style="margin:0 0 16px;font-size:20px">⌨️ <span id="shortcutsTitle">Keyboard Shortcuts</span>Keyboard Shortcuts / รีโมท</span></h2>
+    <h2 style="margin:0 0 16px;font-size:20px">⌨️ <span id="shortcutsTitle"></span></h2>
     <div id="shortcutsList" style="display:grid;grid-template-columns:auto 1fr;gap:8px 16px;font-size:13px;align-items:center">
-      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">?</kbd><span id="scHelp">Show this panel</span>
-      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">Ctrl+F</kbd><span id="scSearch">Focus search</span>
-      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">F</kbd><span id="scFullscreen">Fullscreen</span>
-      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">Esc</kbd><span id="scEsc">Close fullscreen / Stop</span>
-      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">←↑↓→</kbd><span id="scArrows">Navigate (D-pad)</span>
-      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">Enter</kbd><span id="scEnter">Play channel</span>
-      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">Space</kbd><span id="scSpace">Play/Pause</span>
-      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">C</kbd><span id="scCast">Cast / AirPlay</span>
-      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">S</kbd><span id="scSubtitle">Toggle subtitles</span>
-      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">P</kbd><span id="scPiP">Picture-in-Picture</span>
-      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">❤ / H</kbd><span id="scFav">Toggle favorite</span>
+      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">?</kbd><span id="scHelp"></span>
+      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">Ctrl+F</kbd><span id="scSearch"></span>
+      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">F</kbd><span id="scFullscreen"></span>
+      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">Esc</kbd><span id="scEsc"></span>
+      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">←↑↓→</kbd><span id="scArrows"></span>
+      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">Enter</kbd><span id="scEnter"></span>
+      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">Space</kbd><span id="scSpace"></span>
+      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">C</kbd><span id="scCast"></span>
+      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">S</kbd><span id="scSubtitle"></span>
+      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">P</kbd><span id="scPiP"></span>
+      <kbd style="background:var(--surface2);padding:4px 8px;border-radius:4px;font-size:12px;text-align:center">❤ / H</kbd><span id="scFav"></span>
     </div>
-    <p style="margin-top:16px;font-size:11px;color:var(--dim);text-align:center" id="scDpad">🎮 Android TV / รีโมท: ใช้ปุ่มทิศทาง + OK + Back</p>
-    <button onclick="document.getElementById('shortcuts-modal').style.display='none'" style="display:block;margin:12px auto 0;background:var(--accent);color:#000;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:600" id="scClose">OK / ปิด</button>
+    <p style="margin-top:16px;font-size:11px;color:var(--dim);text-align:center" id="scDpad"></p>
+    <button onclick="document.getElementById('shortcuts-modal').style.display='none'" style="display:block;margin:12px auto 0;background:var(--accent);color:#000;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:600" id="scClose"><span id='scCloseBtn'></span></button>
   </div>
 </div>
 
