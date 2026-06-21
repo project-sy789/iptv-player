@@ -748,10 +748,6 @@ function renderHome(){
   $('breadcrumb').innerHTML='<span>🏠 Home</span>';
   $('chCount').textContent=ALL.length.toLocaleString()+' channels';
   
-  // Featured row: top channels with highest quality
-  const featured=ALL.filter(c=>c.quality&&parseInt(c.quality)>=1080&&c.logo).slice(0,20);
-  
-  // Top countries as cards
   let html='<div class="welcome">';
   html+='<h2>🌍 Browse by Country</h2>';
   html+='<p>'+ALL.length.toLocaleString()+' channels from '+Object.keys(DB).length+' countries</p>';
@@ -764,20 +760,69 @@ function renderHome(){
     </div>`;
   }
   html+='</div></div>';
-  
-  // Featured row
-  if(featured.length>8){
-    html+=renderRow('⭐ Featured','High quality channels',featured);
+
+  // 1. Most Played 🔥 (tracked locally)
+  const played=getMostPlayed(20);
+  if(played.length>=5){
+    html+=renderRow('🔥 Most Played','Your top channels',played);
   }
-  
-  // Top categories across all countries
-  const topCats=getTopCategories(10);
+
+  // 2. Verified Working ✅ (tested alive)
+  const alive=getAliveChannels(20);
+  if(alive.length>=5){
+    html+=renderRow('✅ Verified Working','Tested & alive',alive);
+  }
+
+  // 3. Featured (high quality, broader criteria)
+  const featured=ALL.filter(c=>c.quality&&parseInt(c.quality)>=720).slice(0,25);
+  if(featured.length>=5){
+    html+=renderRow('⭐ Featured','720p+ quality channels',featured);
+  }
+
+  // 4. Popular categories with live channels
+  const popularCats=['Sports','News','Entertainment','Music','Movies','Kids','Documentary'];
+  for(const cat of popularCats){
+    const chs=getCatChannels(cat,25);
+    if(chs.length>=4){
+      // Prefer alive channels first
+      chs.sort((a,b)=>getStatus(a)==='alive'?-1:getStatus(b)==='alive'?1:0);
+      html+=renderRow('📺 '+cat,chs.length+' channels',chs);
+    }
+  }
+
+  // 5. Remaining top categories
+  const topCats=getTopCategories(8);
   for(const [cat,chs] of topCats){
-    html+=renderRow('📂 '+cat,chs.length+' channels',chs.slice(0,30));
+    if(popularCats.includes(cat))continue;
+    html+=renderRow('📂 '+cat,chs.length+' channels',chs.slice(0,25));
   }
   
   $('content').innerHTML=html;
-  setTimeout(autoTestVisible,500);
+  setTimeout(autoTestVisible,800);
+}
+
+function getCatChannels(cat,max){
+  const r=[];for(const ch of ALL){if(ch.cat===cat){r.push(ch);if(r.length>=max)break}}return r;
+}
+
+function getMostPlayed(n){
+  const plays=loadPlayCounts();
+  const sorted=Object.entries(plays).sort((a,b)=>b[1]-a[1]).slice(0,n);
+  return sorted.map(([idx])=>ALL[parseInt(idx)]).filter(Boolean);
+}
+
+function getAliveChannels(n){
+  const r=[];for(const ch of ALL){if(getStatus(ch)==='alive'){r.push(ch);if(r.length>=n)break}}return r;
+}
+
+function loadPlayCounts(){
+  try{return JSON.parse(localStorage.getItem('iptv_plays')||'{}')}catch(e){return{}}
+}
+function savePlayCounts(plays){try{localStorage.setItem('iptv_plays',JSON.stringify(plays))}catch(e){}}
+function recordPlay(idx){
+  const plays=loadPlayCounts();
+  plays[idx]=(plays[idx]||0)+1;
+  savePlayCounts(plays);
 }
 
 function getTopCategories(n){
@@ -955,6 +1000,7 @@ function play(idx){
   // Update highlights
   document.querySelectorAll('.card.playing').forEach(c=>c.classList.remove('playing'));
   initPlayer(ch);
+  recordPlay(idx);
   toast('▶ '+ch.name);
 }
 
