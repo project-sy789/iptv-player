@@ -512,12 +512,12 @@ body{
 <div id="login-overlay">
   <div class="login-box">
     <div class="icon">📺</div>
-    <h2>IPTV Player</h2>
-    <p>Enter password to access 12,513 channels</p>
-    <input type="password" id="loginPass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
-    <button onclick="doLogin()">🔓 Unlock</button>
+    <h2 id="loginTitle">เครื่องเล่น IPTV</h2>
+    <p id="loginDesc">ใส่รหัสผ่านเพื่อเข้าใช้งาน</p>
+    <input type="password" id="loginPass" placeholder="รหัสผ่าน" onkeydown="if(event.key==='Enter')doLogin()">
+    <button id="loginBtn" onclick="doLogin()">🔓 ปลดล็อค</button>
     <div class="error" id="loginError"></div>
-    <div class="hint">🔒 Protected · iptv-org</div>
+    <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
   </div>
 </div>
 
@@ -528,12 +528,12 @@ body{
 <aside id="sidebar">
   <div class="logo"><span class="icon">📺</span>IPTV<span class="ver">iptv-org</span></div>
   <div class="search-wrap">
-    <input type="text" placeholder="🔍 Search 12,513 channels..." oninput="debounceSearch()" id="searchInput">
+    <input type="text" placeholder="🔍 ค้นหาช่อง..." oninput="debounceSearch()" id="searchInput">
   </div>
   <nav id="nav">
-    <div class="section">Navigation</div>
-    <button class="on" onclick="goHome()" id="navHome">🏠 Home</button>
-    <div class="section">Countries</div>
+    <div class="section" id="navSection">เมนู</div>
+    <button class="on" onclick="goHome()" id="navHome">🏠 หน้าแรก</button>
+    <div class="section" id="countrySection">ประเทศ</div>
     <div id="countryList"></div>
   </nav>
   <div class="footer">
@@ -550,9 +550,10 @@ body{
       <span class="dot"></span> <span id="chCount">—</span>
       <span style="margin-left:8px;font-size:10px;opacity:.5" id="updateTime"></span>
     </div>
-    <button onclick="refreshData()" title="Refresh from iptv-org" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:7px 14px;border-radius:6px;cursor:pointer;font-size:12px;margin-left:8px">🔄 Refresh</button>
-    <button onclick="testVisibleChannels()" title="Test stream signals" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:7px 12px;border-radius:6px;cursor:pointer;font-size:12px">📶 Test</button>
-    <button onclick="doLogout()" id="logout-btn">🚪 Logout</button>
+    <button onclick="refreshData()" title="Refresh from iptv-org" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:7px 14px;border-radius:6px;cursor:pointer;font-size:12px;margin-left:8px" id="refreshBtn">🔄 รีเฟรช</button>
+    <button onclick="testVisibleChannels()" title="Test stream signals" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:7px 12px;border-radius:6px;cursor:pointer;font-size:12px" id="testBtn">📶 ทดสอบ</button>
+    <span id="langToggle" style="cursor:pointer;font-size:12px;color:var(--dim);margin:0 4px;user-select:none" onclick="setLang(LANG==='th'?'en':'th')">TH | EN</span>
+    <button onclick="doLogout()" id="logout-btn">🚪 ออกจากระบบ</button>
   </div>
   <div id="content">
     <div class="loading"><span class="emoji">📡</span>Fetching channels...</div>
@@ -568,8 +569,8 @@ body{
   <select id="qualitySelect" onchange="setQuality(this.value)" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:4px 8px;border-radius:4px;font-size:11px;max-width:90px">
     <option value="-1">Auto</option>
   </select>
-  <button id="castBtn" onclick="toggleCast()" title="Cast to TV" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px">📡 Cast</button>
-  <button onclick="openFullscreen()">⛶ Full</button>
+  <button id="castBtn" onclick="toggleCast()" title="Cast to TV" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px">📡 แคสต์</button>
+  <button onclick="openFullscreen()">⛶ เต็มจอ</button>
   <button class="danger" onclick="stop()">✕</button>
 </div>
 
@@ -579,9 +580,9 @@ body{
     <select id="overlayQuality" onchange="setQuality(this.value)" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:4px 8px;border-radius:4px;font-size:11px;max-width:90px">
       <option value="-1">Auto</option>
     </select>
-    <button id="overlayCastBtn" onclick="toggleCast()" title="Cast" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px">📡 Cast</button>
-    <button onclick="closeFullscreen()">⬇ Minimize</button>
-    <button onclick="fullStop()" style="background:#e04040">✕ Stop</button>
+    <button id="overlayCastBtn" onclick="toggleCast()" title="Cast" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px">📡 แคสต์</button>
+    <button onclick="closeFullscreen()">⬇ ย่อ</button>
+    <button onclick="fullStop()" style="background:#e04040">✕ หยุด</button>
   </div>
   <video id="video" controls autoplay></video>
 </div>
@@ -615,6 +616,81 @@ const countryFlag = cc => {
   return`<b class="cc-badge" title="${name}">${cc}</b>`;
 };
 const countryName = cc => COUNTRY_NAMES[cc]||cc||'Unknown';
+
+// ====== i18n ======
+var LANG=(()=>{try{return localStorage.getItem('iptv_lang')||'th'}catch(e){return'th'}})();
+function setLang(l){
+  LANG=l;try{localStorage.setItem('iptv_lang',l)}catch(e){}
+  renderLangToggle();
+  if(ALL.length){if(currentView==='country')renderCountry(currentCountry);else goHome();}
+}
+const T={
+  loginTitle:{en:'IPTV Player',th:'เครื่องเล่น IPTV'},
+  loginDesc:{en:'Enter password to access',th:'ใส่รหัสผ่านเพื่อเข้าใช้งาน'},
+  loginPlace:{en:'Password',th:'รหัสผ่าน'},
+  loginBtn:{en:'🔓 Unlock',th:'🔓 ปลดล็อค'},
+  loginHint:{en:'🔒 Protected · iptv-org',th:'🔒 ป้องกัน · iptv-org'},
+  loginErr:{en:'❌ Wrong password',th:'❌ รหัสผ่านผิด'},
+  loginEmpty:{en:'Enter password',th:'กรุณาใส่รหัสผ่าน'},
+  navHome:{en:'🏠 Home',th:'🏠 หน้าแรก'},
+  navCountries:{en:'Countries',th:'ประเทศ'},
+  navNav:{en:'Navigation',th:'เมนู'},
+  refresh:{en:'🔄 Refresh',th:'🔄 รีเฟรช'},
+  test:{en:'📶 Test',th:'📶 ทดสอบ'},
+  logout:{en:'🚪 Logout',th:'🚪 ออกจากระบบ'},
+  homeTitle:{en:'🌍 Browse by Country',th:'🌍 เลือกตามประเทศ'},
+  homeDesc:(n,c)=>LANG==='th'?`${n.toLocaleString()} ช่อง จาก ${c} ประเทศ`:`${n.toLocaleString()} channels from ${c} countries`,
+  recentRow:{en:'🕐 Recently Watched',th:'🕐 ดูล่าสุด'},
+  recentSub:{en:'Continue watching',th:'ดูต่อ'},
+  playedRow:{en:'🔥 Most Played',th:'🔥 ยอดนิยม'},
+  playedSub:{en:'Your top channels',th:'ช่องที่ดูบ่อย'},
+  aliveRow:{en:'✅ Verified Working',th:'✅ สัญญาณดี'},
+  aliveSub:{en:'Tested & alive',th:'ทดสอบแล้วใช้งานได้'},
+  featRow:{en:'⭐ Featured',th:'⭐ แนะนำ'},
+  featSub:{en:'720p+ quality channels',th:'ช่องความชัด 720p+'},
+  fullscreen:{en:'⛶ Full',th:'⛶ เต็มจอ'},
+  stop:{en:'✕',th:'✕'},
+  cast:{en:'📡 Cast',th:'📡 แคสต์'},
+  castConnected:{en:'📡 Connected',th:'📡 เชื่อมต่อ'},
+  loading:{en:'Loading...',th:'กำลังโหลด...'},
+  playing:{en:'▶ Playing',th:'▶ กำลังเล่น'},
+  tapStart:{en:'⚠️ Tap to start',th:'⚠️ แตะเพื่อเริ่ม'},
+  streamDead:{en:'❌ Stream unavailable — try another channel',th:'❌ สัญญาณใช้ไม่ได้ — ลองช่องอื่น'},
+  noUrl:{en:'❌ No stream URL',th:'❌ ไม่มีลิงก์สตรีม'},
+  castOk:{en:'📡 Casting to TV',th:'📡 กำลังแคสต์ไปทีวี'},
+  castFail:{en:'❌ Cast failed',th:'❌ แคสต์ไม่สำเร็จ'},
+  testing:{en:'📶 Testing',th:'📶 กำลังทดสอบ'},
+  noChannels:{en:'No channels visible',th:'ไม่มีช่องให้ทดสอบ'},
+  searchPlace:{en:'🔍 Search channels...',th:'🔍 ค้นหาช่อง...'},
+  chCount:(n)=>LANG==='th'?`${n.toLocaleString()} ช่อง`:`${n.toLocaleString()} channels`,
+  chIn:(n,cc)=>LANG==='th'?`${n.toLocaleString()} ช่องใน ${countryName(cc)}`:`${n.toLocaleString()} channels in ${countryName(cc)}`,
+  categories:(n)=>LANG==='th'?`${n} หมวดหมู่`:`${n} categories`,
+  results:(n)=>LANG==='th'?`${n.toLocaleString()} ผลลัพธ์`:`${n.toLocaleString()} results`,
+  noResults:{en:'No results for',th:'ไม่พบผลลัพธ์สำหรับ'},
+  showingFirst:{en:'Showing first',th:'แสดงผลแรก'},
+  refine:{en:'Refine your search.',th:'ลองค้นหาให้เจาะจงขึ้น'},
+  locked:{en:'Locked',th:'ล็อคอยู่'},
+  downloading:{en:'Downloading playlist (~2.5MB)...',th:'กำลังดาวน์โหลดรายการช่อง...'},
+  parsing:{en:'Indexing channels...',th:'กำลังจัดเรียงช่อง...'},
+  fetchFail:{en:'Failed to load playlist',th:'โหลดรายการช่องไม่สำเร็จ'},
+  updated:{en:'✅ Updated!',th:'✅ อัปเดตแล้ว!'},
+  updateAvail:{en:'⚠️ Update available',th:'⚠️ มีอัปเดต'},
+  justNow:{en:'just now',th:'เมื่อกี้'},
+  cached:{en:'cached',th:'แคช'},
+};
+const tn = (key, ...args) => {
+  const v = T[key];
+  if (!v) return key;
+  if (typeof v === 'function') return v(...args);
+  if (typeof v === 'object') return v[LANG] || v.en || key;
+  return v;
+};
+
+function renderLangToggle(){
+  const b=document.getElementById('langToggle');
+  if(!b)return;
+  b.innerHTML=LANG==='th'?'<b>TH</b> | EN':'TH | <b>EN</b>';
+}
 
 // ====== M3U PARSER ======
 function parseM3U(text){
@@ -657,7 +733,7 @@ async function loadData(){
     if(c&&t&&Date.now()-parseInt(t)<CACHE_TTL){raw=c;$('lastUpdate').textContent='cached '+new Date(parseInt(t)).toLocaleTimeString()}
   }catch(e){}
   if(!raw){
-    $('content').innerHTML='<div class="loading"><span class="emoji">📡</span>Downloading 2.5MB playlist...</div>';
+    $('content').innerHTML='<div class="loading"><span class="emoji">📡</span>'+tn('downloading')+'</div>';
     try{
       const r=await fetch(M3U_URL);
       if(!r.ok)throw new Error('HTTP '+r.status);
@@ -670,7 +746,7 @@ async function loadData(){
       return;
     }
   }
-  $('content').innerHTML='<div class="loading"><span class="emoji">⚙️</span>Indexing channels...</div>';
+  $('content').innerHTML='<div class="loading"><span class="emoji">⚙️</span>'+tn('parsing')+'</div>';
   await sleep(10);
   
   const entries=parseM3U(raw);
@@ -749,8 +825,8 @@ function renderHome(){
   $('chCount').textContent=ALL.length.toLocaleString()+' channels';
   
   let html='<div class="welcome">';
-  html+='<h2>🌍 Browse by Country</h2>';
-  html+='<p>'+ALL.length.toLocaleString()+' channels from '+Object.keys(DB).length+' countries</p>';
+  html+='<h2>'+tn('homeTitle')+'</h2>';
+  html+='<p>'+tn('homeDesc',ALL.length,Object.keys(DB).length)+'</p>';
   html+='<div class="country-grid">';
   for(const c of COUNTRY_LIST.slice(0,24)){
     html+=`<div class="country-card" onclick="goCountry('${c.cc}')">
@@ -761,22 +837,28 @@ function renderHome(){
   }
   html+='</div></div>';
 
+  // 0. Recently Watched 🕐 (always first)
+  const recent=getRecentlyWatched(20);
+  if(recent.length>=1){
+    html+=renderRow(tn('recentRow'),tn('recentSub'),recent);
+  }
+
   // 1. Most Played 🔥 (tracked locally)
   const played=getMostPlayed(20);
   if(played.length>=5){
-    html+=renderRow('🔥 Most Played','Your top channels',played);
+    html+=renderRow(tn('playedRow'),tn('playedSub'),played);
   }
 
   // 2. Verified Working ✅ (tested alive)
   const alive=getAliveChannels(20);
   if(alive.length>=5){
-    html+=renderRow('✅ Verified Working','Tested & alive',alive);
+    html+=renderRow(tn('aliveRow'),tn('aliveSub'),alive);
   }
 
   // 3. Featured (high quality, broader criteria)
   const featured=ALL.filter(c=>c.quality&&parseInt(c.quality)>=720).slice(0,25);
   if(featured.length>=5){
-    html+=renderRow('⭐ Featured','720p+ quality channels',featured);
+    html+=renderRow(tn('featRow'),tn('featSub'),featured);
   }
 
   // 4. Popular categories with live channels
@@ -823,6 +905,23 @@ function recordPlay(idx){
   const plays=loadPlayCounts();
   plays[idx]=(plays[idx]||0)+1;
   savePlayCounts(plays);
+  // Also track recent watches
+  const recent=loadRecentWatches();
+  recent[idx]=Date.now();
+  saveRecentWatches(recent);
+}
+
+function loadRecentWatches(){
+  try{return JSON.parse(localStorage.getItem('iptv_recent')||'{}')}catch(e){return{}}
+}
+function saveRecentWatches(r){try{localStorage.setItem('iptv_recent',JSON.stringify(r))}catch(e){}}
+function getRecentlyWatched(n){
+  const recent=loadRecentWatches();
+  return Object.entries(recent)
+    .sort((a,b)=>b[1]-a[1])
+    .slice(0,n)
+    .map(([idx])=>ALL[parseInt(idx)])
+    .filter(Boolean);
 }
 
 function getTopCategories(n){
@@ -985,6 +1084,8 @@ function debounceSearch(){
 }
 
 // ====== PLAYER ======
+function isMobile(){return /Android|iPhone|iPad|iPod|webOS/i.test(navigator.userAgent)||window.innerWidth<768}
+
 function play(idx){
   const ch=ALL[idx];
   if(!ch||!ch.url)return;
@@ -1001,7 +1102,13 @@ function play(idx){
   document.querySelectorAll('.card.playing').forEach(c=>c.classList.remove('playing'));
   initPlayer(ch);
   recordPlay(idx);
-  toast('▶ '+ch.name);
+  
+  // On mobile/tablet: auto fullscreen
+  if(isMobile()){
+    openFullscreen();
+  }else{
+    toast('▶ '+ch.name);
+  }
 }
 
 function initPlayer(ch){
@@ -1011,10 +1118,10 @@ function initPlayer(ch){
   resetQualityUI();
   
   // Show loading toast
-  toast('⏳ Loading...');
+  toast(tn('loading'));
   
   if(!ch.url){
-    toast('❌ No stream URL');
+    toast(tn('noUrl'));
     return;
   }
   
@@ -1028,8 +1135,8 @@ function initPlayer(ch){
       const h=urlHash(ch.url);
       streamStatus[h]={status:'alive',time:Date.now()};
       saveStreamStatus();refreshStatusUI();
-      video.play().then(()=>toast('▶ Playing'))
-        .catch(()=>toast('⚠️ Tap to start'));
+      video.play().then(()=>toast(tn('playing')))
+        .catch(()=>toast(tn('tapStart')));
     });
     hls.on(Hls.Events.ERROR,(ev,data)=>{
       console.warn('HLS error:',data.type,data.details);
@@ -1042,7 +1149,7 @@ function initPlayer(ch){
         // Try direct play as fallback
         video.src=ch.url;
         video.play().catch(()=>{
-          toast('❌ Stream unavailable — try another channel');
+          toast(tn('streamDead'));
           stop();
         });
       }
@@ -1165,8 +1272,8 @@ async function refreshData(){
     const entries=parseM3U(raw);
     ALL=entries.map(extractInfo);
     buildDB();
-    $('lastUpdate').textContent='Updated just now';
-    $('updateTime').textContent='just now';
+    $('lastUpdate').textContent=tn('updated');
+    $('updateTime').textContent=tn('justNow');
     if(currentView==='country')renderCountry(currentCountry);
     else goHome();
     toast('✅ Updated! '+ALL.length.toLocaleString()+' channels');
@@ -1215,7 +1322,7 @@ function updateCastUI(){
   const active=!!castSession;
   ['castBtn','overlayCastBtn'].forEach(id=>{
     const b=$(id);if(!b)return;
-    b.textContent=active?'📡 Connected':'📡 Cast';
+    b.textContent=active?tn('castConnected'):tn('cast');
     b.style.background=active?'var(--live)':'';
     b.style.color=active?'#000':'';
   });
@@ -1241,9 +1348,9 @@ async function toggleCast(){
         await session.loadMedia(req);
         castSession=session;
         updateCastUI();
-        toast('📡 Casting to TV');
+        toast(tn('castOk'));
       }
-    }catch(e){toast('❌ Cast failed')}
+    }catch(e){toast(tn('castFail'))}
   }
 }
 
@@ -1257,7 +1364,7 @@ async function sha256(text){
 function isLoggedIn(){return sessionStorage.getItem('iptv_auth')==='1'}
 async function doLogin(){
   const pass=$('loginPass').value;
-  if(!pass){$('loginError').textContent='Enter password';return}
+  if(!pass){$('loginError').textContent=tn('loginEmpty');return}
   const hash=await sha256(pass);
   if(hash===PASS_HASH){
     sessionStorage.setItem('iptv_auth','1');
@@ -1266,7 +1373,7 @@ async function doLogin(){
     if(!ALL.length)loadData();
     else goHome();
   }else{
-    $('loginError').textContent='❌ Wrong password';
+    $('loginError').textContent=tn('loginErr');
     $('loginPass').value='';$('loginPass').focus();
   }
 }
