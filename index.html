@@ -568,7 +568,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     </form>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
-    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.3.1</div>
+    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.3.2</div>
   </div>
 </div>
 
@@ -1423,7 +1423,6 @@ function playUrl(url){
   $('barSub').textContent=ch.cat;
   $('player-bar').classList.add('on');
   initPlayer(ch);
-  $('player-overlay').classList.add('on');
   openFullscreen();
 }
 
@@ -1462,8 +1461,6 @@ function play(idx){
   showPiPButton();
   loadEpgForChannel(ch);
   
-  // Show overlay first (so video has a visible container to render into)
-  $('player-overlay').classList.add('on');
   // Auto fullscreen — called from click handler so user gesture is preserved
   openFullscreen();
 }
@@ -1657,13 +1654,8 @@ function openFullscreen(){
 function onFullscreenChange(){
   if(!document.fullscreenElement&&!document.webkitFullscreenElement){
     // Exited native fullscreen
-    if(isMobile()){
-      // iPad/iPhone: keep video playing in overlay instead of stopping
-      $('player-overlay').classList.add('on');
-      // Don't stop — let user keep watching + browse
-    }else{
-      $('player-overlay').classList.remove('on');
-    }
+    $('player-overlay').classList.remove('on');
+    // Player bar stays visible (already has .on from play())
   }
 }
 document.addEventListener('fullscreenchange',onFullscreenChange);
