@@ -1836,18 +1836,24 @@ async function sha256(text){
 }
 function isLoggedIn(){return sessionStorage.getItem('iptv_auth')==='1'}
 async function doLogin(){
-  const pass=$('loginPass').value;
-  if(!pass){$('loginError').textContent=tn('loginEmpty');return}
-  const hash=await sha256(pass);
-  if(hash===PASS_HASH){
-    sessionStorage.setItem('iptv_auth','1');
-    $('login-overlay').classList.add('hidden');
-    $('loginError').textContent='';
-    if(!ALL.length)loadData();
-    else goHome();
-  }else{
-    $('loginError').textContent=tn('loginErr');
-    $('loginPass').value='';$('loginPass').focus();
+  try{
+    const pass=$('loginPass').value;
+    if(!pass){$('loginError').textContent=tn('loginEmpty');return}
+    $('loginError').textContent='⏳ '+tn('loading');
+    const hash=await sha256(pass);
+    if(hash===PASS_HASH){
+      sessionStorage.setItem('iptv_auth','1');
+      $('login-overlay').classList.add('hidden');
+      $('loginError').textContent='';
+      if(!ALL.length)loadData();
+      else goHome();
+    }else{
+      $('loginError').textContent=tn('loginErr');
+      $('loginPass').value='';$('loginPass').focus();
+    }
+  }catch(e){
+    console.error('Login error:',e);
+    $('loginError').textContent='⚠️ Error: '+e.message;
   }
 }
 function doLogout(){
