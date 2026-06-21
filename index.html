@@ -2,8 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>📺 IPTV — iptv-org</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>📺 IPTV Player</title>
+<meta name="description" content="ดูทีวีสด 12,000+ ช่อง — รองรับ Chromecast, ซับไตเติ้ล, เลือกความชัด">
+<meta name="theme-color" content="#0c0c14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="IPTV">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="preconnect" href="https://iptv-org.github.io">
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
 <style>
@@ -1735,6 +1746,62 @@ if(isLoggedIn()){
   $('login-overlay').classList.add('hidden');
   loadData();
 }
+
+// ── PWA Service Worker + อัปเดตอัตโนมัติ ──
+if('serviceWorker' in navigator){
+  let refreshing=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(refreshing)return;
+    refreshing=true;
+    // แจ้งผู้ใช้ก่อน reload
+    const banner=document.createElement('div');
+    banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#f0a030;color:#000;padding:14px 20px;text-align:center;font-weight:700;font-size:14px;cursor:pointer;animation:slideDown .3s ease';
+    banner.textContent='✅ อัปเดตเรียบร้อย! แตะเพื่อรีเฟรช / Tap to refresh';
+    banner.onclick=()=>window.location.reload();
+    document.body.prepend(banner);
+    setTimeout(()=>{
+      banner.style.opacity='0';
+      banner.style.transition='opacity .3s';
+      setTimeout(()=>banner.remove(),300);
+      window.location.reload();
+    },3000);
+  });
+
+  navigator.serviceWorker.register('/iptv-player/sw.js',{scope:'/iptv-player/'}).then(reg=>{
+    // ตรวจสอบอัปเดตทุกครั้งที่เปิด
+    reg.addEventListener('updatefound',()=>{
+      const newWorker=reg.installing;
+      newWorker.addEventListener('statechange',()=>{
+        if(newWorker.state==='installed'&&navigator.serviceWorker.controller){
+          // New version available — แจ้งเตือน
+          const banner=document.createElement('div');
+          banner.style.cssText='position:fixed;bottom:70px;left:50%;transform:translateX(-50%);z-index:99999;background:var(--surface2);color:var(--accent);padding:12px 20px;border-radius:8px;text-align:center;font-weight:600;font-size:13px;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.5);border:1px solid var(--accent);animation:slideUp .3s ease';
+          banner.textContent='🔄 มีเวอร์ชันใหม่! อัปเดตเลย / New version — Update now';
+          banner.onclick=()=>{
+            banner.textContent='⏳ กำลังอัปเดต...';
+            banner.onclick=null;
+            newWorker.postMessage('SKIP_WAITING');
+          };
+          document.body.appendChild(banner);
+          // ซ่อนหลัง 10 วิ
+          setTimeout(()=>{
+            banner.style.opacity='0';
+            banner.style.transition='opacity .3s';
+            setTimeout(()=>banner.remove(),300);
+          },10000);
+        }
+      });
+    });
+
+    // ตรวจสอบอัปเดตทุก 30 นาที
+    setInterval(()=>reg.update(),30*60*1000);
+  }).catch(()=>{}); // fail silently — PWA optional
+}
+
+// Animation keyframes (add via JS since we can't modify head now)
+const style=document.createElement('style');
+style.textContent='@keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}@keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}';
+document.head.appendChild(style);
 </script>
 </body>
 </html>
