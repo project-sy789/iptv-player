@@ -362,6 +362,8 @@ body{
   padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;
 }
 #player-overlay .topbar button:hover{background:#444}
+/* Subtitle/caption styling */
+video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-serif;font-size:1.1em;text-shadow:0 1px 2px #000;line-height:1.4}
 #player-overlay video{flex:1;width:100%;max-height:calc(100vh - 56px);background:#000}
 
 /* Toast */
@@ -569,6 +571,8 @@ body{
   <select id="qualitySelect" onchange="setQuality(this.value)" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:4px 8px;border-radius:4px;font-size:11px;max-width:90px">
     <option value="-1">Auto</option>
   </select>
+  <select id="audioSelect" onchange="setAudioTrack(this.value)" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:4px 8px;border-radius:4px;font-size:11px;max-width:60px"><option value="-1">🔊</option></select>
+  <button id="ccBtn" onclick="toggleSubtitle()" title="Subtitles/CC" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px">💬</button>
   <button id="castBtn" onclick="toggleCast()" title="Cast to TV" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px">📡 แคสต์</button>
   <button onclick="openFullscreen()">⛶ เต็มจอ</button>
   <button class="danger" onclick="stop()">✕</button>
@@ -580,6 +584,8 @@ body{
     <select id="overlayQuality" onchange="setQuality(this.value)" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:4px 8px;border-radius:4px;font-size:11px;max-width:90px">
       <option value="-1">Auto</option>
     </select>
+    <select id="overlayAudio" onchange="setAudioTrack(this.value)" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:4px 8px;border-radius:4px;font-size:11px;max-width:60px"><option value="-1">🔊</option></select>
+    <button id="overlayCcBtn" onclick="toggleSubtitle()" title="Subtitles/CC" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px">💬</button>
     <button id="overlayCastBtn" onclick="toggleCast()" title="Cast" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px">📡 แคสต์</button>
     <button onclick="closeFullscreen()">⬇ ย่อ</button>
     <button onclick="fullStop()" style="background:#e04040">✕ หยุด</button>
@@ -678,6 +684,10 @@ const T={
   justNow:{en:'just now',th:'เมื่อกี้'},
   cached:{en:'cached',th:'แคช'},
   clearRecent:{en:'🗑 Clear',th:'🗑 ล้าง'},
+  audioDefault:{en:'🔊 Audio',th:'🔊 เสียง'},
+  subtitleBtn:{en:'💬 CC',th:'💬 ซับ'},
+  subtitleOn:{en:'💬 Subtitles ON',th:'💬 ซับเปิด'},
+  subtitleOff:{en:'💬 Subtitles OFF',th:'💬 ซับปิด'},
 };
 const tn = (key, ...args) => {
   const v = T[key];
@@ -1253,6 +1263,8 @@ function initPlayer(ch){
     hls.attachMedia(video);
     hls.on(Hls.Events.MANIFEST_PARSED,(ev,data)=>{
       buildQualityUI(hls.levels);
+      buildAudioUI(hls.audioTracks);
+      buildSubtitleUI(hls.subtitleTracks);
       // Mark stream as alive
       const h=urlHash(ch.url);
       streamStatus[h]={status:'alive',time:Date.now()};
@@ -1290,6 +1302,17 @@ function resetQualityUI(){
     const s=$(id);s.style.display='none';s.innerHTML='<option value="-1">Auto</option>';
   });
 }
+function resetAudioUI(){
+  ['audioSelect','overlayAudio'].forEach(id=>{
+    const s=$(id);if(s){s.style.display='none';s.innerHTML='<option value="-1">🔊</option>';}
+  });
+}
+function resetSubtitleUI(){
+  ['ccBtn','overlayCcBtn'].forEach(id=>{
+    const b=$(id);if(b){b.style.display='none';b.classList.remove('on');}
+  });
+}
+function resetPlayerUIs(){resetQualityUI();resetAudioUI();resetSubtitleUI();}
 function buildQualityUI(levels){
   if(!levels||levels.length<2)return;
   let opts='<option value="-1">Auto</option>';
@@ -1301,6 +1324,52 @@ function buildQualityUI(levels){
   ['qualitySelect','overlayQuality'].forEach(id=>{
     const s=$(id);s.innerHTML=opts;s.style.display='inline-block';
   });
+}
+function buildAudioUI(tracks){
+  if(!tracks||tracks.length<2)return resetAudioUI();
+  let opts='';
+  tracks.forEach((t,i)=>{
+    const lang=(t.lang||t.name||'').toUpperCase();
+    const lbl=t.name||('Track '+i);
+    opts+=`<option value="${i}">🔊 ${lang||lbl}</option>`;
+  });
+  ['audioSelect','overlayAudio'].forEach(id=>{
+    const s=$(id);if(s){s.innerHTML=opts;s.style.display='inline-block';}
+  });
+}
+function buildSubtitleUI(tracks){
+  if(!tracks||!tracks.length)return resetSubtitleUI();
+  const subs=tracks.filter(t=>t.type==='SUBTITLES'||!t.default);
+  if(!subs.length)return resetSubtitleUI();
+  ['ccBtn','overlayCcBtn'].forEach(id=>{
+    const b=$(id);if(b){b.style.display='inline-block';b.title=tracks.map(t=>(t.lang||t.name||'?').toUpperCase()).join(', ');}
+  });
+}
+function setAudioTrack(val){
+  if(!hls)return;
+  hls.audioTrack=parseInt(val);
+  ['audioSelect','overlayAudio'].forEach(id=>{
+    const s=$(id);if(s)s.value=val;
+  });
+  const t=hls.audioTracks[val];
+  toast('🔊 Audio: '+((t&&t.lang)?t.lang.toUpperCase():val));
+}
+function toggleSubtitle(){
+  if(!hls||!hls.subtitleTracks||!hls.subtitleTracks.length)return;
+  if(hls.subtitleTrack>=0){
+    hls.subtitleTrack=-1;
+    hls.subtitleDisplay=false;
+    ['ccBtn','overlayCcBtn'].forEach(id=>{const b=$(id);if(b)b.classList.remove('on');});
+    toast(tn('subtitleOff'));
+  }else{
+    const idx=hls.subtitleTracks.findIndex(t=>t.type==='SUBTITLES'||!t.default);
+    const trackIdx=idx>=0?idx:0;
+    hls.subtitleTrack=trackIdx;
+    hls.subtitleDisplay=true;
+    ['ccBtn','overlayCcBtn'].forEach(id=>{const b=$(id);if(b)b.classList.add('on');});
+    const t=hls.subtitleTracks[trackIdx];
+    toast('💬 '+((t&&t.lang)?t.lang.toUpperCase():'ON'));
+  }
 }
 function setQuality(val){
   if(!hls)return;
@@ -1320,7 +1389,7 @@ function stop(){
   if(hls){hls.destroy();hls=null}
   $('video').src='';
   currentChannel=null;
-  resetQualityUI();
+  resetPlayerUIs();
   $('player-bar').classList.remove('on');
   $('player-overlay').classList.remove('on');
   document.querySelectorAll('.card.playing').forEach(c=>c.classList.remove('playing'));
