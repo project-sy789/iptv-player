@@ -568,7 +568,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     </form>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
-    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.3.2</div>
+    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.3.3</div>
   </div>
 </div>
 
@@ -1309,14 +1309,16 @@ function renderCategory(cc,cat){
     const qlClass=(!ch.quality||parseInt(ch.quality)<720)?'sd':'';
     const idx=ALL.indexOf(ch);
     const sd=statusDot(ch);
-    
+    const logoHtml=ch.logo?`<img src="${esc(ch.logo)}" loading="lazy" onerror="this.style.display='none'" style="width:48px;height:48px;border-radius:8px;object-fit:contain;background:var(--surface2);flex-shrink:0" alt="">`:`<div class="thumb">${flag||'📺'}${sd}</div>`;
+
     html+=`<div class="${cls}" onclick="play(${idx})" tabindex="0" onkeydown="if(event.key==='Enter')play(${idx})">
-      <div class="thumb">${flag||'📺'}${sd}</div>
+      ${logoHtml}
       <div class="detail">
         <div class="nm">${esc(ch.name)}</div>
         <div class="mt">${esc(ch.cat)}${ch.geo?' · 🔒':''}${ch.not247?' · ⏰':''}</div>
       </div>
       ${ch.quality?`<span class="ql-badge ${qlClass}">${ch.quality}</span>`:''}
+      ${sd}
     </div>`;
   }
   html+='</div>';
