@@ -638,6 +638,39 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
 <div class="toast" id="toast"></div>
 
 <script>
+// ── Login (standalone — works even if main script breaks) ──
+const PASS_HASH='ad95d5fa651ba86d8923fe1238d24a4f1988a752acfe426ac72ac7c04471bc17';
+function isLoggedIn(){return sessionStorage.getItem('iptv_auth')==='1'}
+async function doLogin(){
+  try{
+    var pass=document.getElementById('loginPass').value;
+    var err=document.getElementById('loginError');
+    if(!pass){err.textContent='Enter password / ใส่รหัสผ่าน';return}
+    err.textContent='Loading…';
+    var enc=new TextEncoder().encode(pass);
+    var buf=await crypto.subtle.digest('SHA-256',enc);
+    var hash=Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0')}).join('');
+    if(hash===PASS_HASH){
+      sessionStorage.setItem('iptv_auth','1');
+      document.getElementById('login-overlay').classList.add('hidden');
+      err.textContent='';
+      location.reload();
+    }else{
+      err.textContent='Wrong password (pw: free) / รหัสผิด (รหัส: free)';
+      document.getElementById('loginPass').value='';
+      document.getElementById('loginPass').focus();
+    }
+  }catch(e){
+    document.getElementById('loginError').textContent='Error: '+e.message+' — try refresh / ลองรีเฟรช';
+  }
+}
+function doLogout(){
+  sessionStorage.removeItem('iptv_auth');
+  location.reload();
+}
+</script>
+
+<script>
 // ====== GLOBALS ======
 var ALL = [];
 var DB = {}; // { countryCode: { flag, categories: { catName: [channels] } } }
@@ -1833,47 +1866,6 @@ function toggleCast(){
 }
 
 // ====== LOGIN ======
-const PASS_HASH='ad95d5fa651ba86d8923fe1238d24a4f1988a752acfe426ac72ac7c04471bc17';
-async function sha256(text){
-  const enc=new TextEncoder().encode(text);
-  const buf=await crypto.subtle.digest('SHA-256',enc);
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-}
-function isLoggedIn(){return sessionStorage.getItem('iptv_auth')==='1'}
-async function doLogin(){
-  try{
-    const pass=$('loginPass').value;
-    if(!pass){$('loginError').textContent=tn('loginEmpty');return}
-    $('loginError').textContent='⏳ '+tn('loading');
-    const hash=await sha256(pass);
-    if(hash===PASS_HASH){
-      sessionStorage.setItem('iptv_auth','1');
-      $('login-overlay').classList.add('hidden');
-      $('loginError').textContent='';
-      if(!ALL.length)loadData();
-      else goHome();
-    }else{
-      $('loginError').textContent=tn('loginErr')+(LANG==='th'?' (รหัส: free)':' (pw: free)');
-      $('loginPass').value='';$('loginPass').focus();
-    }
-  }catch(e){
-    console.error(e);
-    $('loginError').textContent=(LANG==='th'?'⚠️ ขัดข้อง — ลองรีเฟรช (Ctrl+Shift+R)':'⚠️ Error — try refresh (Ctrl+Shift+R)');
-  }
-}
-function doLogout(){
-  sessionStorage.removeItem('iptv_auth');
-  if(hls){hls.destroy();hls=null}
-  $('video').src='';currentChannel=null;
-  $('player-bar').classList.remove('on');
-  ['barHeart','overlayHeart'].forEach(id=>{const b=$(id);if(b){b.textContent='🤍';b.classList.remove('on');}});
-  $('player-overlay').classList.remove('on');
-  $('login-overlay').classList.remove('hidden');
-  $('loginPass').value='';$('loginError').textContent='';
-  ALL=[];DB={};COUNTRY_LIST=[];
-  $('content').innerHTML='<div class="loading"><span class="emoji">🔒</span>Locked</div>';
-  $('chCount').textContent='—';
-}
 
 // ====== STREAM TESTING ======
 const STREAM_KEY='iptv_stream_status';
