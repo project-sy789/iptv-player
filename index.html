@@ -146,6 +146,8 @@ body{
   border-bottom:1px solid var(--border);
   background:var(--surface);
   flex-shrink:0;
+  min-height:56px;
+  flex-wrap:wrap;
 }
 #topbar .title{font-size:18px;font-weight:700}
 #topbar .sub{font-size:13px;color:var(--dim);margin-left:4px}
@@ -555,7 +557,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     </form>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
-    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.0.1</div>
+    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.1.0</div>
   </div>
 </div>
 
@@ -689,6 +691,7 @@ var currentView = 'home'; // 'home' | 'country' | 'category' | 'search'
 var currentCountry = null;
 var currentCategory = null;
 var filterTimer = null;
+var _dataLoaded = false;
 
 const CACHE_KEY = 'iptv_full_v3';
 const CACHE_TS = 'iptv_ts_v3';
@@ -898,6 +901,8 @@ function extractInfo(e){
 
 // ====== DATA LOADING ======
 async function loadData(){
+  if(_dataLoaded)return;
+  _dataLoaded=true;
   let raw=null;
   try{
     const c=localStorage.getItem(CACHE_KEY),t=localStorage.getItem(CACHE_TS);
@@ -1025,13 +1030,7 @@ function renderHome(){
     html+='</div>';
   }
 
-  // 1. Verified Working ✅ (tested alive)
-  const alive=getAliveChannels(20);
-  if(alive.length>=5){
-    html+=renderRow(tn('aliveRow'),tn('aliveSub'),alive);
-  }
-
-  // 2. Featured (high quality, broader criteria)
+  // 1. Featured (high quality, broader criteria)
   const featured=ALL.filter(c=>c.quality&&parseInt(c.quality)>=720).slice(0,25);
   if(featured.length>=5){
     html+=renderRow(tn('featRow'),tn('featSub'),featured);
@@ -1397,7 +1396,7 @@ function playUrl(url){
   $('barSub').textContent=ch.cat;
   $('player-bar').classList.add('on');
   initPlayer(ch);
-  if(isMobile())openFullscreen();
+  setTimeout(()=>openFullscreen(),100);
 }
 
 // ====== SEARCH ======
@@ -1435,12 +1434,8 @@ function play(idx){
   showPiPButton();
   loadEpgForChannel(ch);
   
-  // On mobile/tablet: auto fullscreen
-  if(isMobile()){
-    openFullscreen();
-  }else{
-    toast('▶ '+ch.name);
-  }
+  // Auto fullscreen on all devices for immediate playback
+  setTimeout(()=>openFullscreen(),100);
 }
 
 function initPlayer(ch){
