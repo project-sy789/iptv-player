@@ -32,17 +32,17 @@
   --radius-sm: 8px;
   --sidebar-w: 240px;
 }
-/* Light theme (auto-detect from system) */
-@media (prefers-color-scheme: light){
-  :root{--bg:#f5f5f7;--surface:#fff;--surface2:#eee;--border:#ddd;--text:#1a1a2e;--dim:#666}
-  #player-bar{background:var(--surface);border-top-color:var(--border)}
-  #topbar{background:var(--surface);border-bottom-color:var(--border)}
-  #sidebar{background:var(--surface);border-right-color:var(--border)}
-  .row-scroll .card:hover{box-shadow:0 8px 25px rgba(0,0,0,.15)}
-  .country-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.1)}
-  #player-overlay .topbar{background:rgba(0,0,0,.85)}
-  video::cue{background:rgba(0,0,0,.85)}
+/* Light theme */
+html.light-theme{
+  --bg:#f5f5f7;--surface:#fff;--surface2:#eee;--border:#ddd;--text:#1a1a2e;--dim:#666;
 }
+html.light-theme #player-bar{background:var(--surface);border-top-color:var(--border)}
+html.light-theme #topbar{background:var(--surface);border-bottom-color:var(--border)}
+html.light-theme #sidebar{background:var(--surface);border-right-color:var(--border)}
+html.light-theme .row-scroll .card:hover{box-shadow:0 8px 25px rgba(0,0,0,.15)}
+html.light-theme .country-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.1)}
+html.light-theme #player-overlay .topbar{background:rgba(0,0,0,.85)}
+html.light-theme video::cue{background:rgba(0,0,0,.85)}
 
 *{margin:0;padding:0;box-sizing:border-box}
 body{
@@ -568,7 +568,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     </form>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
-    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.3.0</div>
+    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.3.1</div>
   </div>
 </div>
 
@@ -723,12 +723,26 @@ const countryName = cc => COUNTRY_NAMES[cc]||cc||'Unknown';
 
 // ====== i18n ======
 var LANG=(()=>{try{return localStorage.getItem('iptv_lang')||'th'}catch(e){return'th'}})();
+
+// ====== THEME ======
 var THEME=(()=>{try{return localStorage.getItem('iptv_theme')||'auto'}catch(e){return'auto'}})();
+var _mqDark=window.matchMedia('(prefers-color-scheme: dark)');
 function applyTheme(){
-  const root=document.documentElement;
-  if(THEME==='dark')root.style.colorScheme='dark';
-  else if(THEME==='light')root.style.colorScheme='light';
-  else root.style.colorScheme='light dark';
+  const html=document.documentElement;
+  if(THEME==='dark'){
+    html.classList.remove('light-theme');
+    html.style.colorScheme='dark';
+  }else if(THEME==='light'){
+    html.classList.add('light-theme');
+    html.style.colorScheme='light';
+  }else{ // auto
+    if(_mqDark.matches){
+      html.classList.remove('light-theme');
+    }else{
+      html.classList.add('light-theme');
+    }
+    html.style.colorScheme='light dark';
+  }
   const tb=document.getElementById('themeToggle');
   if(tb)tb.textContent=THEME==='dark'?'🌙':THEME==='light'?'☀️':'🌓';
 }
@@ -737,6 +751,8 @@ function toggleTheme(){
   try{localStorage.setItem('iptv_theme',THEME)}catch(e){}
   applyTheme();
 }
+// Listen for system theme changes
+_mqDark.addEventListener('change',function(){if(THEME==='auto')applyTheme();});
 applyTheme();
 
 function setLang(l){
