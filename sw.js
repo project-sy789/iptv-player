@@ -1,6 +1,6 @@
-// 📺 IPTV Player — Service Worker v4
-// v4: fixes fullscreen re-entry + overlay topbar visibility
-const CACHE = 'iptv-player-v4';
+// 📺 IPTV Player — Service Worker v5
+// v5: 3-source merge (iptv-org M3U + Free-TV + streams.json API)
+const CACHE = 'iptv-player-v5';
 const ASSETS = [
   '/iptv-player/',
   '/iptv-player/manifest.json',

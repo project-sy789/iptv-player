@@ -571,7 +571,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     </form>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
-    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.6.0</div>
+    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.7.0</div>
   </div>
 </div>
 
@@ -713,6 +713,9 @@ const M3U_URL = 'https://iptv-org.github.io/iptv/index.m3u';
 const FREE_TV_URL = 'https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8';
 const FREE_TV_CACHE = 'iptv_freetv_v1';
 const FREE_TV_TS = 'iptv_freetv_ts_v1';
+const STREAMS_API = 'https://iptv-org.github.io/api/streams.json';
+const STREAMS_CACHE = 'iptv_streams_v1';
+const STREAMS_TS = 'iptv_streams_ts_v1';
 const CACHE_TTL = 6 * 3600 * 1000;
 
 // ====== HELPERS ======
@@ -957,6 +960,22 @@ function extractInfoFreeTV(e){
   };
 }
 
+// iptv-org API streams.json parser
+function extractInfoStream(s){
+  return{
+    name:(s.title||'Unknown').trim(),
+    quality:s.quality||null,
+    cat:'Other',
+    country:null,
+    logo:null,
+    geo:s.label&&/geo-block/i.test(s.label),
+    not247:s.label&&/not 24/i.test(s.label),
+    tvgId:s.channel||null,
+    url:s.url||'',
+    _src:'iptv-api'
+  };
+}
+
 // ====== DATA LOADING ======
 async function loadData(){
   if(_dataLoaded)return;
@@ -995,7 +1014,23 @@ async function loadData(){
         raw2=await r2.text();
         try{localStorage.setItem(FREE_TV_CACHE,raw2);localStorage.setItem(FREE_TV_TS,Date.now().toString())}catch(e){}
       }
-    }catch(e){/* Free-TV optional — don't block on failure */}
+    }catch(e){/* Free-TV optional */}
+  }
+
+  // ── Load iptv-org streams.json (tertiary) ──
+  let raw3=null;
+  try{
+    const c3=localStorage.getItem(STREAMS_CACHE),t3=localStorage.getItem(STREAMS_TS);
+    if(c3&&t3&&Date.now()-parseInt(t3)<CACHE_TTL){raw3=c3;}
+  }catch(e){}
+  if(!raw3){
+    try{
+      const r3=await fetch(STREAMS_API);
+      if(r3.ok){
+        raw3=await r3.text();
+        try{localStorage.setItem(STREAMS_CACHE,raw3);localStorage.setItem(STREAMS_TS,Date.now().toString())}catch(e){}
+      }
+    }catch(e){/* Streams API optional */}
   }
 
   $('content').innerHTML='<div class="loading"><span class="emoji">⚙️</span>'+tn('parsing')+'</div>';
@@ -1012,35 +1047,56 @@ async function loadData(){
     ch2=entries2.map(extractInfoFreeTV);
   }
 
-  // ── Merge: deduplicate by URL, prefer Free-TV metadata when present ──
+  // ── Parse streams.json ──
+  let ch3=[];
+  if(raw3){
+    try{
+      const streams=JSON.parse(raw3);
+      ch3=streams.map(extractInfoStream);
+    }catch(e){}
+  }
+
+  // ── Merge: deduplicate by URL, prefer richer metadata ──
   const seen=new Map(); // url → channel
   for(const ch of ch1){
     if(ch.url)seen.set(ch.url,ch);
   }
-  let newFromFT=0, upgraded=0;
+  let newFromFT=0, upgraded=0, newFromAPI=0;
   for(const ch of ch2){
     if(!ch.url)continue;
     const existing=seen.get(ch.url);
     if(existing){
-      // Upgrade metadata if Free-TV has better info
       let better=false;
       if(ch.logo&&!existing.logo){existing.logo=ch.logo;better=true;}
       if(ch.tvgId&&!existing.tvgId){existing.tvgId=ch.tvgId;better=true;}
       if(ch.country&&!existing.country){existing.country=ch.country;better=true;}
       if(better)upgraded++;
     }else{
-      // New channel from Free-TV
       seen.set(ch.url,ch);
       newFromFT++;
+    }
+  }
+  for(const ch of ch3){
+    if(!ch.url)continue;
+    const existing=seen.get(ch.url);
+    if(existing){
+      // Upgrade metadata from API (quality, tvgId)
+      if(ch.quality&&!existing.quality){existing.quality=ch.quality;}
+      if(ch.tvgId&&!existing.tvgId){existing.tvgId=ch.tvgId;}
+    }else{
+      seen.set(ch.url,ch);
+      newFromAPI++;
     }
   }
   ALL=Array.from(seen.values());
 
   buildDB();
   goHome();
-  if(newFromFT||upgraded){
-    setTimeout(()=>toast('🆕 +'+newFromFT+' new, ✨ '+upgraded+' upgraded from Free-TV'),1500);
-  }
+  var msgs=[];
+  if(newFromFT)msgs.push('+'+newFromFT+' Free-TV');
+  if(newFromAPI)msgs.push('+'+newFromAPI+' API');
+  if(upgraded)msgs.push('✨ '+upgraded+' upgraded');
+  if(msgs.length)setTimeout(()=>toast('🆕 '+msgs.join(', ')),1500);
 }
 function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
 
@@ -1884,9 +1940,9 @@ function closeSidebar(){
 // ====== REFRESH ======
 async function refreshData(){
   $('chCount').textContent='Refreshing...';
-  toast('🔄 Fetching latest from iptv-org + Free-TV...');
+  toast('🔄 Fetching latest from 3 sources...');
   try{
-    // Refresh iptv-org
+    // Refresh iptv-org M3U
     const r1=await fetch(M3U_URL,{cache:'no-cache'});
     if(!r1.ok)throw new Error('HTTP '+r1.status);
     const raw1=await r1.text();
@@ -1904,12 +1960,24 @@ async function refreshData(){
       }
     }catch(e){}
 
-    // Parse & merge
+    // Refresh streams.json API
+    let raw3=null;
+    try{
+      const r3=await fetch(STREAMS_API,{cache:'no-cache'});
+      if(r3.ok){
+        raw3=await r3.text();
+        localStorage.setItem(STREAMS_CACHE,raw3);
+        localStorage.setItem(STREAMS_TS,Date.now().toString());
+      }
+    }catch(e){}
+
+    // Parse & merge all 3 sources
     const ch1=parseM3U(raw1).map(extractInfo);
     const ch2=raw2?parseM3U(raw2).map(extractInfoFreeTV):[];
+    let ch3=[];if(raw3){try{ch3=JSON.parse(raw3).map(extractInfoStream)}catch(e){}}
     const seen=new Map();
     for(const ch of ch1){if(ch.url)seen.set(ch.url,ch);}
-    let newFromFT=0;
+    let newFromFT=0, newFromAPI=0;
     for(const ch of ch2){
       if(!ch.url)continue;
       const ex=seen.get(ch.url);
@@ -1919,14 +1987,22 @@ async function refreshData(){
         if(ch.country&&!ex.country)ex.country=ch.country;
       }else{seen.set(ch.url,ch);newFromFT++;}
     }
+    for(const ch of ch3){
+      if(!ch.url)continue;
+      const ex=seen.get(ch.url);
+      if(ex){if(ch.quality&&!ex.quality)ex.quality=ch.quality;}
+      else{seen.set(ch.url,ch);newFromAPI++;}
+    }
     ALL=Array.from(seen.values());
     buildDB();
     $('lastUpdate').textContent=tn('updated');
     $('updateTime').textContent=tn('justNow');
     if(currentView==='country')renderCountry(currentCountry);
     else goHome();
-    const msg='✅ Updated! '+ALL.length.toLocaleString()+' channels';
-    toast(newFromFT?msg+' (+'+newFromFT+' from Free-TV)':msg);
+    var msgs=[ALL.length.toLocaleString()+' channels'];
+    if(newFromFT)msgs.push('+'+newFromFT+' Free-TV');
+    if(newFromAPI)msgs.push('+'+newFromAPI+' API');
+    toast('✅ '+msgs.join(', '));
   }catch(e){
     toast('❌ Refresh failed: '+e.message);
   }
@@ -1951,6 +2027,18 @@ setInterval(async ()=>{
     if(lm2){
       const cachedTs2=localStorage.getItem(FREE_TV_TS);
       if(cachedTs2&&new Date(lm2).getTime()>parseInt(cachedTs2)){
+        $('lastUpdate').textContent='⚠️ Update available';
+        $('updateTime').textContent='⚠️ new';
+      }
+    }
+  }catch(e){}
+  // Also check streams.json API
+  try{
+    const r3=await fetch(STREAMS_API,{method:'HEAD',cache:'no-cache'});
+    const lm3=r3.headers.get('last-modified');
+    if(lm3){
+      const cachedTs3=localStorage.getItem(STREAMS_TS);
+      if(cachedTs3&&new Date(lm3).getTime()>parseInt(cachedTs3)){
         $('lastUpdate').textContent='⚠️ Update available';
         $('updateTime').textContent='⚠️ new';
       }
