@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📺 IPTV — iptv-org</title>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<style>
+:root {
+  --bg: #0c0c14;
+  --surface: #151525;
+  --surface2: #1e1e35;
+  --border: #2a2a45;
+  --text: #e8e8f0;
+  --dim: #8888a0;
+  --accent: #f0a030;
+  --accent2: #e04040;
+  --live: #30c860;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --sidebar-w: 240px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  height:100vh;
+  display:flex;
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* === SIDEBAR === */
+#sidebar{
+  width:var(--sidebar-w);
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+  flex-shrink:0;
+  z-index:10;
+}
+#sidebar .logo{
+  padding:18px 16px 14px;
+  font-size:20px;
+  font-weight:700;
+  color:var(--accent);
+  letter-spacing:-0.5px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  border-bottom:1px solid var(--border);
+}
+#sidebar .logo .icon{font-size:28px}
+#sidebar .logo .ver{font-size:10px;color:var(--dim);font-weight:400;margin-left:auto}
+#sidebar .search-wrap{padding:12px}
+#sidebar .search-wrap input{
+  width:100%;
+  padding:10px 14px;
+  border-radius:var(--radius-sm);
+  border:1px solid var(--border);
+  background:var(--surface2);
+  color:var(--text);
+  font-size:13px;
+  outline:none;
+  transition:border-color .2s;
+}
+#sidebar .search-wrap input:focus{border-color:var(--accent)}
+#sidebar .search-wrap input::placeholder{color:var(--dim)}
+#sidebar nav{flex:1;overflow-y:auto;padding:6px 8px}
+#sidebar nav .section{
+  padding:10px 10px 4px;
+  font-size:10px;
+  font-weight:600;
+  color:var(--dim);
+  text-transform:uppercase;
+  letter-spacing:1.5px;
+}
+#sidebar nav button{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  text-align:left;
+  padding:9px 12px;
+  margin:1px 0;
+  border:none;
+  border-radius:var(--radius-sm);
+  background:transparent;
+  color:var(--dim);
+  font-size:13px;
+  cursor:pointer;
+  transition:all .15s;
+}
+#sidebar nav button:hover{background:var(--surface2);color:var(--text)}
+#sidebar nav button.on{background:var(--accent);color:#000;font-weight:600}
+#sidebar nav button .fi{width:22px;text-align:center;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center}
+#sidebar nav button .cnt{font-size:11px;margin-left:auto;opacity:.6}
+#sidebar .footer{
+  padding:12px;
+  border-top:1px solid var(--border);
+  font-size:11px;
+  color:var(--dim);
+  text-align:center;
+  line-height:1.5;
+}
+
+/* === MAIN === */
+#main{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  position:relative;
+}
+#topbar{
+  padding:14px 24px;
+  display:flex;
+  align-items:center;
+  gap:16px;
+  border-bottom:1px solid var(--border);
+  background:var(--surface);
+  flex-shrink:0;
+}
+#topbar .title{font-size:18px;font-weight:700}
+#topbar .sub{font-size:13px;color:var(--dim);margin-left:4px}
+#topbar .breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--dim)}
+#topbar .breadcrumb span{cursor:pointer;transition:color .15s}
+#topbar .breadcrumb span:hover{color:var(--accent)}
+#topbar .breadcrumb .sep{color:var(--border);cursor:default}
+#topbar .spacer{flex:1}
+#topbar .stats{font-size:12px;color:var(--dim);display:flex;align-items:center;gap:6px}
+#topbar .stats .dot{width:7px;height:7px;border-radius:50%;background:var(--live)}
+
+/* === CONTENT === */
+#content{flex:1;overflow-y:auto;padding-bottom:80px}
+#content::-webkit-scrollbar{width:6px}
+#content::-webkit-scrollbar-track{background:transparent}
+#content::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* Row (Netflix-style horizontal scroll) */
+.row-wrap{margin-bottom:28px}
+.row-wrap .row-title{
+  padding:0 24px;
+  font-size:18px;
+  font-weight:700;
+  margin-bottom:12px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.row-wrap .row-title .badge{
+  font-size:12px;
+  color:var(--dim);
+  font-weight:400;
+}
+.row-scroll{
+  display:flex;
+  gap:10px;
+  padding:0 24px;
+  overflow-x:auto;
+  scroll-behavior:smooth;
+  scrollbar-width:none;
+  -ms-overflow-style:none;
+}
+.row-scroll::-webkit-scrollbar{display:none}
+.row-scroll .card{
+  flex-shrink:0;
+  width:200px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  overflow:hidden;
+  cursor:pointer;
+  transition:all .2s;
+}
+.row-scroll .card:hover{
+  border-color:var(--accent);
+  transform:translateY(-3px);
+  box-shadow:0 8px 25px rgba(0,0,0,.4);
+}
+.row-scroll .card.playing{border-color:var(--live);box-shadow:0 0 0 2px var(--live)}
+.row-scroll .card .poster{
+  height:112px;
+  background:var(--surface2);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  position:relative;
+  overflow:hidden;
+}
+.row-scroll .card .poster img{
+  width:100%;height:100%;object-fit:contain;
+  background:var(--surface2);
+}
+.row-scroll .card .poster .ql-badge{
+  position:absolute;top:8px;right:8px;
+  padding:2px 8px;border-radius:4px;
+  font-size:10px;font-weight:700;
+  background:rgba(0,0,0,.7);color:var(--accent);
+  border:1px solid rgba(255,255,255,.1);
+}
+.row-scroll .card .poster .live-dot{
+  position:absolute;top:8px;left:8px;
+  width:8px;height:8px;border-radius:50%;
+  background:var(--live);
+  box-shadow:0 0 6px var(--live);
+}
+.row-scroll .card .info{padding:10px 12px}
+.row-scroll .card .info .name{
+  font-size:13px;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.row-scroll .card .info .meta{
+  font-size:11px;color:var(--dim);
+  margin-top:4px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+
+/* Grid view */
+.grid-view{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;padding:24px}
+.grid-view .card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:12px;
+  cursor:pointer;
+  transition:all .15s;
+  display:flex;align-items:center;gap:12px;
+}
+.grid-view .card:hover{border-color:var(--accent);transform:translateY(-1px)}
+.grid-view .card.playing{border-color:var(--live);box-shadow:0 0 0 1px var(--live)}
+.grid-view .card .thumb{
+  width:48px;height:48px;border-radius:8px;
+  background:var(--surface2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;flex-shrink:0;
+}
+.grid-view .card .detail{flex:1;min-width:0}
+.grid-view .card .detail .nm{
+  font-size:13px;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.grid-view .card .detail .mt{
+  font-size:11px;color:var(--dim);margin-top:2px;
+}
+.grid-view .card .ql-badge{
+  padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;
+  background:#1e3a5f;color:#60a5fa;flex-shrink:0;
+}
+.grid-view .card .ql-badge.sd{background:#3a1e1e;color:#f87171}
+
+/* Welcome / Country grid */
+.welcome{padding:24px}
+.welcome h2{font-size:24px;margin-bottom:8px}
+.welcome p{color:var(--dim);margin-bottom:24px;line-height:1.6}
+.country-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.country-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:18px;
+  cursor:pointer;
+  transition:all .2s;
+  text-align:center;
+}
+.country-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.3)}
+.country-card .flag{font-size:32px;font-weight:800;margin-bottom:8px;width:56px;height:56px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;margin:0 auto 10px;color:var(--accent);border:2px solid var(--border)}
+.country-card .name{font-size:14px;font-weight:600}
+.country-card .count{font-size:12px;color:var(--dim);margin-top:4px}
+
+/* Country code badge (replaces emoji flags) */
+.cc-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:22px;height:22px;border-radius:4px;
+  background:var(--surface2);color:var(--accent);
+  font-size:10px;font-weight:700;letter-spacing:0.5px;
+  flex-shrink:0;
+}
+.cc-badge.na{color:var(--dim);background:transparent;border:1px dashed var(--border)}
+.poster-cc{
+  width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--surface2),var(--surface));
+}
+.poster-cc span{
+  font-size:28px;font-weight:800;color:var(--accent);opacity:.6;
+}
+
+/* Loading */
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px;color:var(--dim)}
+.loading .emoji{font-size:48px;animation:pulse 1.5s infinite;margin-bottom:16px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Player bar (bottom) */
+#player-bar{
+  position:fixed;bottom:0;left:var(--sidebar-w);right:0;
+  height:0;background:var(--surface);
+  border-top:1px solid var(--border);
+  transition:height .3s;
+  display:flex;align-items:center;
+  padding:0 20px;gap:14px;
+  overflow:hidden;z-index:50;
+}
+#player-bar.on{height:62px}
+#player-bar .thumb{
+  width:40px;height:40px;border-radius:6px;
+  background:var(--surface2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;flex-shrink:0;
+}
+#player-bar .info{flex:1;min-width:0}
+#player-bar .info .nm{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#player-bar .info .sub{font-size:11px;color:var(--dim)}
+#player-bar button{
+  background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);
+  padding:7px 14px;border-radius:6px;
+  cursor:pointer;font-size:12px;transition:all .15s;
+}
+#player-bar button:hover{background:var(--border)}
+#player-bar button.danger{background:var(--accent2);border-color:var(--accent2);color:#fff}
+#player-bar button.danger:hover{opacity:.85}
+
+/* Fullscreen player */
+#player-overlay{
+  position:fixed;inset:0;background:#000;z-index:200;
+  display:none;flex-direction:column;
+}
+#player-overlay.on{display:flex}
+#player-overlay .topbar{
+  padding:10px 20px;display:flex;align-items:center;gap:12px;
+  background:#0a0a0a;border-bottom:1px solid #222;
+}
+#player-overlay .topbar .tname{font-weight:600;font-size:14px;flex:1}
+#player-overlay .topbar button{
+  background:#222;color:#fff;border:none;
+  padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;
+}
+#player-overlay .topbar button:hover{background:#444}
+#player-overlay video{flex:1;width:100%;max-height:calc(100vh - 56px);background:#000}
+
+/* Toast */
+.toast{
+  position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+  background:var(--accent);color:#000;padding:10px 24px;
+  border-radius:20px;font-weight:600;font-size:13px;
+  z-index:300;opacity:0;transition:opacity .3s;
+}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<aside id="sidebar">
+  <div class="logo"><span class="icon">📺</span>IPTV<span class="ver">iptv-org</span></div>
+  <div class="search-wrap">
+    <input type="text" placeholder="🔍 Search 12,513 channels..." oninput="debounceSearch()" id="searchInput">
+  </div>
+  <nav id="nav">
+    <div class="section">Navigation</div>
+    <button class="on" onclick="goHome()" id="navHome">🏠 Home</button>
+    <div class="section">Countries</div>
+    <div id="countryList"></div>
+  </nav>
+  <div class="footer">
+    <span id="lastUpdate">Loading...</span><br>
+    12,513 channels &middot; 176 countries
+  </div>
+</aside>
+
+<div id="main">
+  <div id="topbar">
+    <div class="breadcrumb" id="breadcrumb"><span onclick="goHome()">Home</span></div>
+    <div class="spacer"></div>
+    <div class="stats">
+      <span class="dot"></span> <span id="chCount">—</span>
+      <span style="margin-left:8px;font-size:10px;opacity:.5" id="updateTime"></span>
+    </div>
+    <button onclick="refreshData()" title="Refresh from iptv-org" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:7px 14px;border-radius:6px;cursor:pointer;font-size:12px;margin-left:8px">🔄 Refresh</button>
+  </div>
+  <div id="content">
+    <div class="loading"><span class="emoji">📡</span>Fetching channels...</div>
+  </div>
+</div>
+
+<div id="player-bar">
+  <div class="thumb" id="barThumb">📺</div>
+  <div class="info">
+    <div class="nm" id="barName">—</div>
+    <div class="sub" id="barSub">—</div>
+  </div>
+  <button onclick="openFullscreen()">⛶ Fullscreen</button>
+  <button class="danger" onclick="stop()">✕ Stop</button>
+</div>
+
+<div id="player-overlay">
+  <div class="topbar">
+    <span class="tname" id="overlayName">—</span>
+    <button onclick="closeFullscreen()">⬇ Minimize</button>
+    <button onclick="fullStop()" style="background:#e04040">✕ Stop</button>
+  </div>
+  <video id="video" controls autoplay></video>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ====== GLOBALS ======
+var ALL = [];
+var DB = {}; // { countryCode: { flag, categories: { catName: [channels] } } }
+var COUNTRY_LIST = [];
+var hls = null;
+var currentChannel = null;
+var currentView = 'home'; // 'home' | 'country' | 'category' | 'search'
+var currentCountry = null;
+var currentCategory = null;
+var filterTimer = null;
+
+const CACHE_KEY = 'iptv_full_v3';
+const CACHE_TS = 'iptv_ts_v3';
+const M3U_URL = 'https://iptv-org.github.io/iptv/index.m3u';
+const CACHE_TTL = 6 * 3600 * 1000;
+
+// ====== HELPERS ======
+const $ = id => document.getElementById(id);
+const esc = s => String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
+const COUNTRY_NAMES={AD:"Andorra",AE:"United Arab Emirates",AF:"Afghanistan",AG:"Antigua & Barbuda",AL:"Albania",AM:"Armenia",AO:"Angola",AR:"Argentina",AT:"Austria",AU:"Australia",AW:"Aruba",AZ:"Azerbaijan",BA:"Bosnia & Herzegovina",BB:"Barbados",BD:"Bangladesh",BE:"Belgium",BF:"Burkina Faso",BG:"Bulgaria",BH:"Bahrain",BJ:"Benin",BN:"Brunei",BO:"Bolivia",BQ:"Caribbean Netherlands",BR:"Brazil",BS:"Bahamas",BY:"Belarus",BZ:"Belize",CA:"Canada",CD:"DR Congo",CG:"Congo",CH:"Switzerland",CI:"Côte d'Ivoire",CL:"Chile",CM:"Cameroon",CN:"China",CO:"Colombia",CR:"Costa Rica",CU:"Cuba",CV:"Cape Verde",CW:"Curaçao",CY:"Cyprus",CZ:"Czechia",DE:"Germany",DK:"Denmark",DO:"Dominican Republic",DZ:"Algeria",EC:"Ecuador",EE:"Estonia",EG:"Egypt",EH:"Western Sahara",ER:"Eritrea",ES:"Spain",ET:"Ethiopia",FI:"Finland",FO:"Faroe Islands",FR:"France",GE:"Georgia",GF:"French Guiana",GH:"Ghana",GM:"Gambia",GN:"Guinea",GP:"Guadeloupe",GQ:"Equatorial Guinea",GR:"Greece",GT:"Guatemala",GU:"Guam",GY:"Guyana",HK:"Hong Kong",HN:"Honduras",HR:"Croatia",HT:"Haiti",HU:"Hungary",ID:"Indonesia",IE:"Ireland",IL:"Israel",IN:"India",IQ:"Iraq",IR:"Iran",IS:"Iceland",IT:"Italy",JM:"Jamaica",JO:"Jordan",JP:"Japan",KE:"Kenya",KG:"Kyrgyzstan",KH:"Cambodia",KN:"St. Kitts & Nevis",KP:"North Korea",KR:"South Korea",KW:"Kuwait",KZ:"Kazakhstan",LA:"Laos",LB:"Lebanon",LC:"St. Lucia",LK:"Sri Lanka",LT:"Lithuania",LU:"Luxembourg",LV:"Latvia",LY:"Libya",MA:"Morocco",MC:"Monaco",MD:"Moldova",ME:"Montenegro",MK:"North Macedonia",ML:"Mali",MM:"Myanmar",MN:"Mongolia",MO:"Macau",MQ:"Martinique",MT:"Malta",MV:"Maldives",MX:"Mexico",MY:"Malaysia",MZ:"Mozambique",NA:"Namibia",NE:"Niger",NG:"Nigeria",NI:"Nicaragua",NL:"Netherlands",NO:"Norway",NP:"Nepal",NZ:"New Zealand",OM:"Oman",PA:"Panama",PE:"Peru",PF:"French Polynesia",PG:"Papua New Guinea",PH:"Philippines",PK:"Pakistan",PL:"Poland",PR:"Puerto Rico",PS:"Palestine",PT:"Portugal",PY:"Paraguay",QA:"Qatar",RO:"Romania",RS:"Serbia",RU:"Russia",RW:"Rwanda",SA:"Saudi Arabia",SD:"Sudan",SE:"Sweden",SG:"Singapore",SI:"Slovenia",SK:"Slovakia",SM:"San Marino",SN:"Senegal",SO:"Somalia",SR:"Suriname",SV:"El Salvador",SX:"Sint Maarten",SY:"Syria",TD:"Chad",TG:"Togo",TH:"Thailand",TJ:"Tajikistan",TM:"Turkmenistan",TN:"Tunisia",TR:"Turkey",TT:"Trinidad & Tobago",TW:"Taiwan",TZ:"Tanzania",UA:"Ukraine",UG:"Uganda",UK:"United Kingdom",US:"United States",UY:"Uruguay",UZ:"Uzbekistan",VE:"Venezuela",VG:"British Virgin Islands",VN:"Vietnam",WS:"Samoa",XK:"Kosovo",YE:"Yemen",ZA:"South Africa",ZW:"Zimbabwe"};
+
+const countryFlag = cc => {
+  if(!cc||cc.length!==2)return`<b class="cc-badge na">??</b>`;
+  const name=COUNTRY_NAMES[cc]||cc;
+  return`<b class="cc-badge" title="${name}">${cc}</b>`;
+};
+const countryName = cc => COUNTRY_NAMES[cc]||cc||'Unknown';
+
+// ====== M3U PARSER ======
+function parseM3U(text){
+  const lines=text.split('\n'),entries=[];
+  let i=0;
+  while(i<lines.length){
+    if(lines[i].trim().startsWith('#EXTINF:')){
+      const extinf=lines[i].trim();i++;
+      let url='';
+      if(i<lines.length&&lines[i].trim()&&!lines[i].trim().startsWith('#'))url=lines[i].trim();
+      entries.push({extinf,url});
+    }else{i++}
+  }
+  return entries;
+}
+function extractInfo(e){
+  const x=e.extinf;
+  const nm=x.match(/,([^,\[\n]+?)(?:\s*\[.*?\])?\s*$/);
+  const qm=x.match(/\((\d+p)\)/);
+  const gm=x.match(/group-title="([^"]+)"/);
+  const cm=x.match(/tvg-id="[^"]*\.([a-z]{2})@/);
+  const lm=x.match(/tvg-logo="([^"]+)"/);
+  return{
+    name:nm?nm[1].trim():'Unknown',
+    quality:qm?qm[1]:null,
+    cat:gm?gm[1]:'Other',
+    country:cm?cm[1].toUpperCase():null,
+    logo:lm?lm[1]:null,
+    geo:/\[Geo-blocked\]/i.test(x),
+    not247:/\[Not 24\/7\]/i.test(x),
+    url:e.url
+  };
+}
+
+// ====== DATA LOADING ======
+async function loadData(){
+  let raw=null;
+  try{
+    const c=localStorage.getItem(CACHE_KEY),t=localStorage.getItem(CACHE_TS);
+    if(c&&t&&Date.now()-parseInt(t)<CACHE_TTL){raw=c;$('lastUpdate').textContent='cached '+new Date(parseInt(t)).toLocaleTimeString()}
+  }catch(e){}
+  if(!raw){
+    $('content').innerHTML='<div class="loading"><span class="emoji">📡</span>Downloading 2.5MB playlist...</div>';
+    try{
+      const r=await fetch(M3U_URL);
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      raw=await r.text();
+      try{localStorage.setItem(CACHE_KEY,raw);localStorage.setItem(CACHE_TS,Date.now().toString())}catch(e){}
+      $('lastUpdate').textContent='just now';
+      $('updateTime').textContent='just now';
+    }catch(e){
+      $('content').innerHTML='<div class="loading"><span class="emoji">❌</span>Failed: '+esc(e.message)+'</div>';
+      return;
+    }
+  }
+  $('content').innerHTML='<div class="loading"><span class="emoji">⚙️</span>Indexing channels...</div>';
+  await sleep(10);
+  
+  const entries=parseM3U(raw);
+  ALL=entries.map(extractInfo);
+  buildDB();
+  goHome();
+}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+
+function buildDB(){
+  DB={};COUNTRY_LIST=[];
+  const ccMap={};
+  for(const ch of ALL){
+    const cc=ch.country||'??';
+    if(!DB[cc])DB[cc]={flag:countryFlag(cc),categories:{}};
+    if(!DB[cc].categories[ch.cat])DB[cc].categories[ch.cat]=[];
+    DB[cc].categories[ch.cat].push(ch);
+    ccMap[cc]=(ccMap[cc]||0)+1;
+  }
+  COUNTRY_LIST=Object.entries(ccMap)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([cc,n])=>({cc,flag:countryFlag(cc),count:n}));
+  renderCountryList();
+}
+
+function renderCountryList(){
+  const q=($('searchInput').value||'').toLowerCase();
+  let list=COUNTRY_LIST;
+  if(q)list=list.filter(c=>c.cc.toLowerCase().includes(q));
+  
+  let html='';
+  for(const c of list){
+    const on=currentView==='country'&&currentCountry===c.cc;
+    html+=`<button class="${on?'on':''}" onclick="goCountry('${c.cc}')">
+      <span class="fi">${c.flag||'??'}</span>${countryName(c.cc)}
+      <span class="cnt">${c.count}</span></button>`;
+  }
+  $('countryList').innerHTML=html;
+}
+
+// ====== NAVIGATION ======
+function goHome(){
+  currentView='home';currentCountry=null;currentCategory=null;
+  $('searchInput').value='';
+  updateNavHighlight();
+  renderCountryList();
+  renderHome();
+}
+function goCountry(cc){
+  currentView='country';currentCountry=cc;currentCategory=null;
+  updateNavHighlight();
+  renderCountryList();
+  renderCountry(cc);
+}
+function goCategory(cat){
+  currentCategory=cat;
+  renderCategory(currentCountry,cat);
+}
+
+function updateNavHighlight(){
+  $$('#nav button').forEach(b=>b.classList.remove('on'));
+  if(currentView==='home')$('navHome').classList.add('on');
+}
+
+function $$(sel){return document.querySelectorAll(sel)}
+
+// ====== RENDER: HOME ======
+function renderHome(){
+  const q=($('searchInput').value||'').toLowerCase();
+  if(q){renderSearchResults(q);return;}
+  
+  $('breadcrumb').innerHTML='<span>🏠 Home</span>';
+  $('chCount').textContent=ALL.length.toLocaleString()+' channels';
+  
+  // Featured row: top channels with highest quality
+  const featured=ALL.filter(c=>c.quality&&parseInt(c.quality)>=1080&&c.logo).slice(0,20);
+  
+  // Top countries as cards
+  let html='<div class="welcome">';
+  html+='<h2>🌍 Browse by Country</h2>';
+  html+='<p>'+ALL.length.toLocaleString()+' channels from '+Object.keys(DB).length+' countries</p>';
+  html+='<div class="country-grid">';
+  for(const c of COUNTRY_LIST.slice(0,24)){
+    html+=`<div class="country-card" onclick="goCountry('${c.cc}')">
+      <div class="flag">${c.flag||'??'}</div>
+      <div class="name">${countryName(c.cc)}</div>
+      <div class="count">${c.count.toLocaleString()} channels</div>
+    </div>`;
+  }
+  html+='</div></div>';
+  
+  // Featured row
+  if(featured.length>8){
+    html+=renderRow('⭐ Featured','High quality channels',featured);
+  }
+  
+  // Top categories across all countries
+  const topCats=getTopCategories(10);
+  for(const [cat,chs] of topCats){
+    html+=renderRow('📂 '+cat,chs.length+' channels',chs.slice(0,30));
+  }
+  
+  $('content').innerHTML=html;
+}
+
+function getTopCategories(n){
+  const counts={},samples={};
+  for(const ch of ALL){
+    counts[ch.cat]=(counts[ch.cat]||0)+1;
+    if(!samples[ch.cat])samples[ch.cat]=[];
+    if(samples[ch.cat].length<30)samples[ch.cat].push(ch);
+  }
+  return Object.entries(counts)
+    .sort((a,b)=>b[1]-a[1])
+    .slice(0,n)
+    .map(([cat])=>[cat,samples[cat]]);
+}
+
+// ====== RENDER: COUNTRY ======
+function renderCountry(cc){
+  const data=DB[cc];
+  if(!data){goHome();return;}
+  
+  $('breadcrumb').innerHTML='<span onclick="goHome()">🏠 Home</span><span class="sep">›</span><span>'+data.flag+' '+countryName(cc)+'</span>';
+  
+  const cats=Object.entries(data.categories).sort((a,b)=>b[1].length-a[1].length);
+  const total=cats.reduce((s,[,chs])=>s+chs.length,0);
+  $('chCount').textContent=total.toLocaleString()+' channels in '+countryName(cc);
+  
+  let html='<div class="welcome">';
+  html+='<h2>'+data.flag+' '+countryName(cc)+'</h2>';
+  html+='<p>'+total.toLocaleString()+' channels &middot; '+cats.length+' categories</p>';
+  
+  // Category quick links
+  html+='<div class="country-grid">';
+  for(const [cat,chs] of cats){
+    html+=`<div class="country-card" onclick="goCountry('${cc}');goCategory('${escAttr(cat)}')">
+      <div class="flag">📂</div>
+      <div class="name">${esc(cat)}</div>
+      <div class="count">${chs.length.toLocaleString()} channels</div>
+    </div>`;
+  }
+  html+='</div></div>';
+  
+  // Show first few categories as rows
+  for(const [cat,chs] of cats.slice(0,6)){
+    html+=renderRow(cat,chs.length+' channels',chs.slice(0,30));
+  }
+  
+  $('content').innerHTML=html;
+}
+
+// ====== RENDER: CATEGORY (grid view) ======
+function renderCategory(cc,cat){
+  const data=DB[cc];
+  if(!data||!data.categories[cat])return;
+  const chs=data.categories[cat];
+  
+  $('breadcrumb').innerHTML='<span onclick="goHome()">🏠 Home</span><span class="sep">›</span><span onclick="goCountry(\''+cc+'\')">'+data.flag+' '+countryName(cc)+'</span><span class="sep">›</span><span>'+esc(cat)+'</span>';
+  $('chCount').textContent=chs.length.toLocaleString()+' channels';
+  
+  let html='<div class="grid-view">';
+  for(const ch of chs){
+    const flag=countryFlag(ch.country);
+    const playing=currentChannel&&currentChannel.name===ch.name&&currentChannel.url===ch.url;
+    const cls=playing?'card playing':'card';
+    const qlClass=(!ch.quality||parseInt(ch.quality)<720)?'sd':'';
+    const idx=ALL.indexOf(ch);
+    
+    html+=`<div class="${cls}" onclick="play(${idx})">
+      <div class="thumb">${flag||'📺'}</div>
+      <div class="detail">
+        <div class="nm">${esc(ch.name)}</div>
+        <div class="mt">${esc(ch.cat)}${ch.geo?' · 🔒':''}${ch.not247?' · ⏰':''}</div>
+      </div>
+      ${ch.quality?`<span class="ql-badge ${qlClass}">${ch.quality}</span>`:''}
+    </div>`;
+  }
+  html+='</div>';
+  $('content').innerHTML=html;
+}
+
+// ====== RENDER: SEARCH ======
+function renderSearchResults(q){
+  currentView='search';
+  $('breadcrumb').innerHTML='<span onclick="goHome()">🏠 Home</span><span class="sep">›</span><span>🔍 "'+esc(q)+'"</span>';
+  
+  const results=ALL.filter(ch=>{
+    const s=(ch.name+' '+ch.cat+' '+(ch.country||'')).toLowerCase();
+    return s.includes(q);
+  });
+  
+  $('chCount').textContent=results.length.toLocaleString()+' results';
+  
+  if(results.length===0){
+    $('content').innerHTML='<div class="loading"><span class="emoji">🔍</span>No results for "'+esc(q)+'"</div>';
+    return;
+  }
+  
+  // Group results by country
+  const byCountry={};
+  for(const ch of results.slice(0,500)){
+    const cc=ch.country||'??';
+    if(!byCountry[cc])byCountry[cc]=[];
+    byCountry[cc].push(ch);
+  }
+  
+  let html='';
+  for(const [cc,chs] of Object.entries(byCountry).sort((a,b)=>b[1].length-a[1].length)){
+    const flag=countryFlag(cc);
+    html+=renderRow(flag+' '+countryName(cc),chs.length+' channels',chs.slice(0,30));
+  }
+  if(results.length>500){
+    html+='<div style="text-align:center;padding:20px;color:var(--dim)">Showing first 500 of '+results.length.toLocaleString()+' results. Refine your search.</div>';
+  }
+  $('content').innerHTML=html;
+}
+
+// ====== HORIZONTAL ROW COMPONENT ======
+function renderRow(title,subtitle,channels){
+  if(!channels.length)return'';
+  let h='<div class="row-wrap"><div class="row-title">'+title+' <span class="badge">'+subtitle+'</span></div>';
+  h+='<div class="row-scroll">';
+  for(const ch of channels){
+    const flag=countryFlag(ch.country);
+    const playing=currentChannel&&currentChannel.name===ch.name&&currentChannel.url===ch.url;
+    const cls=playing?'card playing':'card';
+    const idx=ALL.indexOf(ch);
+    const logoHtml=ch.logo?`<img src="${esc(ch.logo)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt=""><div class="poster-cc" style="display:none"><span>${ch.country||'??'}</span></div>`:`<div class="poster-cc"><span>${ch.country||'??'}</span></div>`;
+    
+    h+=`<div class="${cls}" onclick="play(${idx})">
+      <div class="poster">
+        ${ch.geo?'<div class="live-dot" style="background:#e04040;box-shadow:0 0 6px #e04040"></div>':''}
+        ${logoHtml}
+        ${ch.quality?`<span class="ql-badge">${ch.quality}</span>`:''}
+      </div>
+      <div class="info">
+        <div class="name">${esc(ch.name)}</div>
+        <div class="meta">${flag||''} ${esc(ch.cat)}${ch.geo?' 🔒':''}</div>
+      </div>
+    </div>`;
+  }
+  h+='</div></div>';
+  return h;
+}
+
+// ====== SEARCH ======
+function debounceSearch(){
+  clearTimeout(filterTimer);
+  filterTimer=setTimeout(()=>{
+    renderCountryList();
+    const q=($('searchInput').value||'').toLowerCase();
+    if(q){renderSearchResults(q)}
+    else if(currentView==='country')renderCountry(currentCountry);
+    else goHome();
+  },300);
+}
+
+// ====== PLAYER ======
+function play(idx){
+  const ch=ALL[idx];
+  if(!ch||!ch.url)return;
+  currentChannel=ch;
+  
+  const flag=countryFlag(ch.country);
+  $('barThumb').innerHTML=flag||'📺';
+  $('barName').textContent=ch.name;
+  $('barSub').textContent=(ch.quality||'')+' · '+ch.cat+' · '+(ch.country?countryName(ch.country):'??');
+  $('player-bar').classList.add('on');
+  $('overlayName').innerHTML=(flag||'')+' '+esc(ch.name);
+  
+  // Update highlights
+  document.querySelectorAll('.card.playing').forEach(c=>c.classList.remove('playing'));
+  initPlayer(ch);
+  toast('▶ '+ch.name);
+}
+
+function initPlayer(ch){
+  const video=$('video');
+  if(hls){hls.destroy();hls=null}
+  video.src='';
+  
+  if(Hls.isSupported()){
+    hls=new Hls({enableWorker:false,lowLatencyMode:false});
+    hls.loadSource(ch.url);
+    hls.attachMedia(video);
+    hls.on(Hls.Events.MANIFEST_PARSED,()=>video.play().catch(()=>{}));
+    hls.on(Hls.Events.ERROR,(ev,data)=>{
+      if(data.fatal){console.error('HLS',data.type);hls.destroy();hls=null;video.src=ch.url;video.play().catch(()=>{})}
+    });
+  }else if(video.canPlayType('application/vnd.apple.mpegurl')){
+    video.src=ch.url;video.play().catch(()=>{});
+  }else{
+    video.src=ch.url;video.play().catch(()=>{});
+  }
+}
+function stop(){
+  if(hls){hls.destroy();hls=null}
+  $('video').src='';
+  currentChannel=null;
+  $('player-bar').classList.remove('on');
+  $('player-overlay').classList.remove('on');
+  document.querySelectorAll('.card.playing').forEach(c=>c.classList.remove('playing'));
+}
+function openFullscreen(){
+  if(!currentChannel)return;
+  $('player-overlay').classList.add('on');
+  $('video').play().catch(()=>{});
+}
+function closeFullscreen(){$('player-overlay').classList.remove('on')}
+function fullStop(){closeFullscreen();stop()}
+
+function toast(msg){
+  const t=$('toast');t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2000);
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    if($('player-overlay').classList.contains('on'))closeFullscreen();
+    else stop();
+  }
+  if(e.ctrlKey&&e.key==='f'){$('searchInput').focus();e.preventDefault()}
+});
+
+function escAttr(s){return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,"&#39;")}
+
+// ====== REFRESH ======
+async function refreshData(){
+  $('chCount').textContent='Refreshing...';
+  toast('🔄 Fetching latest from iptv-org...');
+  try{
+    const r=await fetch(M3U_URL,{cache:'no-cache'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const raw=await r.text();
+    localStorage.setItem(CACHE_KEY,raw);
+    localStorage.setItem(CACHE_TS,Date.now().toString());
+    const entries=parseM3U(raw);
+    ALL=entries.map(extractInfo);
+    buildDB();
+    $('lastUpdate').textContent='Updated just now';
+    $('updateTime').textContent='just now';
+    if(currentView==='country')renderCountry(currentCountry);
+    else goHome();
+    toast('✅ Updated! '+ALL.length.toLocaleString()+' channels');
+  }catch(e){
+    toast('❌ Refresh failed: '+e.message);
+  }
+}
+// Auto-check for updates every 2 hours
+setInterval(async ()=>{
+  try{
+    const r=await fetch(M3U_URL,{method:'HEAD',cache:'no-cache'});
+    const lm=r.headers.get('last-modified');
+    if(lm){
+      const cachedTs=localStorage.getItem(CACHE_TS);
+      if(cachedTs&&new Date(lm).getTime()>parseInt(cachedTs)){
+        $('lastUpdate').textContent='⚠️ Update available';
+        $('updateTime').textContent='⚠️ new';
+      }
+    }
+  }catch(e){}
+},2*3600*1000);
+
+// ====== BOOT ======
+loadData();
+</script>
+</body>
+</html>
