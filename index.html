@@ -553,6 +553,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     <button id="loginBtn" onclick="doLogin()">🔓 ปลดล็อค</button>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
+    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v1.9.3</div>
   </div>
 </div>
 
@@ -1850,12 +1851,12 @@ async function doLogin(){
       if(!ALL.length)loadData();
       else goHome();
     }else{
-      $('loginError').textContent=tn('loginErr');
+      $('loginError').textContent=tn('loginErr')+(LANG==='th'?' (รหัส: free)':' (pw: free)');
       $('loginPass').value='';$('loginPass').focus();
     }
   }catch(e){
-    console.error('Login error:',e);
-    $('loginError').textContent='⚠️ Error: '+e.message;
+    console.error(e);
+    $('loginError').textContent=(LANG==='th'?'⚠️ ขัดข้อง — ลองรีเฟรช (Ctrl+Shift+R)':'⚠️ Error — try refresh (Ctrl+Shift+R)');
   }
 }
 function doLogout(){
