@@ -1535,36 +1535,67 @@ function testChannel(ch){
   if(streamStatus[h]&&Date.now()-streamStatus[h].time<3600000)return; // tested within 1h
   
   streamStatus[h]={status:'testing',time:Date.now()};
+  saveStreamStatus();
+  refreshStatusUI();
   
-  // Use hidden video element to test M3U8 connectivity
-  const tester=document.createElement('video');
-  tester.muted=true;tester.volume=0;tester.style.display='none';
-  tester.preload='metadata';
-  
+  // Use fetch() to test connectivity — works for M3U8 URLs too (unlike <video> which only Safari supports)
+  // For CORS-blocked URLs, fall back to video element (works on Safari / native HLS)
+  const controller=new AbortController();
   const timeout=setTimeout(()=>{
-    tester.remove();
+    controller.abort();
     streamStatus[h]={status:'dead',time:Date.now()};
     saveStreamStatus();
     refreshStatusUI();
   },8000);
   
-  tester.onloadedmetadata=()=>{
-    clearTimeout(timeout);
-    tester.remove();
-    streamStatus[h]={status:'alive',time:Date.now()};
-    saveStreamStatus();
-    refreshStatusUI();
-  };
-  tester.onerror=()=>{
-    clearTimeout(timeout);
-    tester.remove();
-    streamStatus[h]={status:'dead',time:Date.now()};
-    saveStreamStatus();
-    refreshStatusUI();
-  };
-  
-  document.body.appendChild(tester);
-  tester.src=ch.url;
+  fetch(ch.url, {signal:controller.signal, cache:'no-cache'})
+    .then(r=>{
+      clearTimeout(timeout);
+      // Any response (even 404/500) means server is reachable — stream might work
+      if(r.ok||r.status>0){
+        streamStatus[h]={status:'alive',time:Date.now()};
+      }else{
+        streamStatus[h]={status:'dead',time:Date.now()};
+      }
+      saveStreamStatus();
+      refreshStatusUI();
+    })
+    .catch(err=>{
+      clearTimeout(timeout);
+      // CORS errors (TypeError) mean the server is reachable but blocked
+      // — stream likely works via HLS.js (video element bypasses CORS)
+      if(err.name==='TypeError'&&err.message.includes('Failed to fetch')){
+        // Try video element as fallback (works when CORS blocks fetch but video is fine)
+        const tester=document.createElement('video');
+        tester.muted=true;tester.volume=0;tester.style.display='none';
+        tester.preload='metadata';
+        const vt=setTimeout(()=>{
+          tester.remove();
+          streamStatus[h]={status:'dead',time:Date.now()};
+          saveStreamStatus();
+          refreshStatusUI();
+        },6000);
+        tester.onloadedmetadata=()=>{
+          clearTimeout(vt);tester.remove();
+          streamStatus[h]={status:'alive',time:Date.now()};
+          saveStreamStatus();
+          refreshStatusUI();
+        };
+        tester.onerror=()=>{
+          clearTimeout(vt);tester.remove();
+          streamStatus[h]={status:'dead',time:Date.now()};
+          saveStreamStatus();
+          refreshStatusUI();
+        };
+        document.body.appendChild(tester);
+        tester.src=ch.url;
+      }else{
+        // Network error, DNS failure, timeout — truly dead
+        streamStatus[h]={status:'dead',time:Date.now()};
+        saveStreamStatus();
+        refreshStatusUI();
+      }
+    });
 }
 
 function testChannels(channels,max=5){
@@ -1600,9 +1631,17 @@ function autoTestVisible(){
   cards.forEach(c=>{
     const onclick=c.getAttribute('onclick');
     if(!onclick)return;
-    const m=onclick.match(/play\((\d+)\)/);
-    if(!m)return;
-    const ch=ALL[parseInt(m[1])];
+    // Match play(N) or playUrl('...')
+    let ch=null;
+    const m1=onclick.match(/play\((\d+)\)/);
+    if(m1){ch=ALL[parseInt(m1[1])];}
+    else{
+      const m2=onclick.match(/playUrl\('([^']+)'\)/);
+      if(m2){
+        // Find channel by URL
+        ch=ALL.find(x=>x.url===m2[1])||null;
+      }
+    }
     if(ch&&getStatus(ch)==='unknown')toTest.push(ch);
   });
   if(toTest.length)testChannels(toTest,3);
@@ -1614,10 +1653,13 @@ function testVisibleChannels(){
   cards.forEach(c=>{
     const onclick=c.getAttribute('onclick');
     if(!onclick)return;
-    const m=onclick.match(/play\((\d+)\)/);
-    if(!m)return;
-    const ch=ALL[parseInt(m[1])];
-    if(ch)toTest.push(ch);
+    const m1=onclick.match(/play\((\d+)\)/);
+    if(m1){toTest.push(ALL[parseInt(m1[1])]);return;}
+    const m2=onclick.match(/playUrl\('([^']+)'\)/);
+    if(m2){
+      const ch=ALL.find(x=>x.url===m2[1]);
+      if(ch)toTest.push(ch);
+    }
   });
   if(toTest.length){
     toast('📶 Testing '+toTest.length+' channels...');
