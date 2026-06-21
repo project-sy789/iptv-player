@@ -1796,7 +1796,7 @@ function updateCastUI(){
   });
 }
 
-async var airplayAvailable=false;
+var airplayAvailable=false;
 function setupAirPlay(){
   const v=$('video');
   if(!v||!v.webkitShowPlaybackTargetPicker)return;
@@ -1847,7 +1847,7 @@ function showPiPButton(){
   }
 }
 
-function toggleCast(){
+async function toggleCast(){
   const ctx=cast.framework.CastContext.getInstance();
   if(castSession){
     ctx.endCurrentSession(true);
