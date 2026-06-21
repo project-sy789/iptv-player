@@ -857,16 +857,7 @@ function renderHome(){
     html+='</div>';
   }
 
-  // 1. 🔥 Most Played with view counts
-  const played=getMostPlayed(20);
-  if(played.length>=3){
-    const playCounts=loadPlayCounts();
-    html+='<div class="row-wrap"><div class="row-title">'+tn('playedRow')+' <span class="badge">'+tn('playedSub')+'</span></div>';
-    html+=renderRowScroll(played, playCounts);
-    html+='</div>';
-  }
-
-  // 2. Verified Working ✅ (tested alive)
+  // 1. Verified Working ✅ (tested alive)
   const alive=getAliveChannels(20);
   if(alive.length>=5){
     html+=renderRow(tn('aliveRow'),tn('aliveSub'),alive);
