@@ -549,8 +549,10 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     <div class="icon">📺</div>
     <h2 id="loginTitle">เครื่องเล่น IPTV</h2>
     <p id="loginDesc">ใส่รหัสผ่านเพื่อเข้าใช้งาน</p>
-    <input type="password" id="loginPass" placeholder="รหัสผ่าน" onkeydown="if(event.key==='Enter')doLogin()">
-    <button id="loginBtn" onclick="doLogin()">🔓 ปลดล็อค</button>
+    <form onsubmit="event.preventDefault();(async()=>{try{await doLogin()}catch(e){document.getElementById('loginError').textContent=e.message}})()">
+    <input type="password" id="loginPass" placeholder="รหัสผ่าน" autocomplete="off" inputmode="text">
+    <button type="submit" id="loginBtn">🔓 ปลดล็อค</button>
+    </form>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
     <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v1.9.3</div>
