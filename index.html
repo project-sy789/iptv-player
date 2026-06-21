@@ -568,7 +568,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     </form>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
-    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.2.2</div>
+    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.3.0</div>
   </div>
 </div>
 
@@ -1615,16 +1615,21 @@ function stop(){
 function openFullscreen(){
   if(!currentChannel)return;
   const v=$('video');
-  // Try native fullscreen first (hides browser chrome, true fullscreen)
+  // iPad/iPhone: use iOS-native fullscreen (best experience)
+  if(v.webkitEnterFullscreen){
+    try { v.webkitEnterFullscreen(); } catch(e) {
+      $('player-overlay').classList.add('on');
+    }
+    v.play().catch(()=>{});
+    return;
+  }
+  // Android/Desktop: try standard Fullscreen API
   if(v.requestFullscreen){
     v.requestFullscreen().catch(()=>{
-      // Fallback: CSS overlay
       $('player-overlay').classList.add('on');
     });
   }else if(v.webkitRequestFullscreen){
     v.webkitRequestFullscreen();
-  }else if(v.webkitEnterFullscreen){ // iOS Safari
-    v.webkitEnterFullscreen();
   }else{
     // CSS fallback
     $('player-overlay').classList.add('on');
@@ -1637,9 +1642,10 @@ function onFullscreenChange(){
   if(!document.fullscreenElement&&!document.webkitFullscreenElement){
     // Exited native fullscreen
     if(isMobile()){
-      stop(); // mobile: exit = stop (like Netflix/YouTube)
+      // iPad/iPhone: keep video playing in overlay instead of stopping
+      $('player-overlay').classList.add('on');
+      // Don't stop — let user keep watching + browse
     }else{
-      // desktop: return to mini player
       $('player-overlay').classList.remove('on');
     }
   }
