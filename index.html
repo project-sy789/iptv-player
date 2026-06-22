@@ -743,7 +743,7 @@ const GUVI_TS = 'iptv_guovi_ts_v1';
 const BDIX_M3U_URL = 'https://raw.githubusercontent.com/abusaeeidx/Mrgify-BDIX-IPTV/master/playlist.m3u';
 const BDIX_CACHE = 'iptv_bdix_v1';
 const BDIX_TS = 'iptv_bdix_ts_v1';
-const AKKRADET_URL = 'https://raw.githubusercontent.com/akkradet/IPTV-THAI/main/FREETV.m3u';
+const AKKRADET_URL = 'https://raw.githubusercontent.com/akkradet/IPTV-THAI/master/FREETV.m3u';
 const AKKRADET_CACHE = 'iptv_akkradet_v1';
 const AKKRADET_TS = 'iptv_akkradet_ts_v1';
 const CACHE_TTL = 6 * 3600 * 1000;
@@ -2320,25 +2320,9 @@ function statusDot(ch){
 
 // Auto-test channels when browsing a category
 function autoTestVisible(){
-  const cards=document.querySelectorAll('.card');
-  const toTest=[];
-  cards.forEach(c=>{
-    const onclick=c.getAttribute('onclick');
-    if(!onclick)return;
-    // Match play(N) or playUrl('...')
-    let ch=null;
-    const m1=onclick.match(/play\((\d+)\)/);
-    if(m1){ch=ALL[parseInt(m1[1])];}
-    else{
-      const m2=onclick.match(/playUrl\('([^']+)'\)/);
-      if(m2){
-        // Find channel by URL
-        ch=ALL.find(x=>x.url===m2[1])||null;
-      }
-    }
-    if(ch&&getStatus(ch)==='unknown')toTest.push(ch);
-  });
-  if(toTest.length)testChannels(toTest,3);
+  // Disabled by default: browser CORS/mixed-content policies spam console on many IPTV streams.
+  // Users can still run an explicit signal check with the 📶 Test button.
+  return;
 }
 
 function testVisibleChannels(){
