@@ -1,6 +1,6 @@
-// 📺 IPTV Player — Service Worker v7
-// v7: 5-source merge (iptv-org M3U + Free-TV + streams.json API + Guovin + BDIX)
-const CACHE = 'iptv-player-v7';
+// 📺 IPTV Player — Service Worker v8
+// v8: disable CORS-blocked Guovin runtime fetch
+const CACHE = 'iptv-player-v8';
 const ASSETS = [
   '/iptv-player/',
   '/iptv-player/manifest.json',
