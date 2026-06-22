@@ -571,7 +571,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     </form>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
-    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.7.0</div>
+    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.7.1</div>
   </div>
 </div>
 
@@ -1794,37 +1794,30 @@ function openFullscreen(){
   const v=$('video');
   const overlay=$('player-overlay');
 
-  // iPad/iPhone: use iOS-native fullscreen (best experience)
-  if(v.webkitEnterFullscreen){
-    // Ensure video is playing BEFORE entering fullscreen
-    // Fixes: re-entry fails after exit because video pauses
-    var p=v.play();
-    if(p) p.catch(()=>{});
-    try {
-      v.webkitEnterFullscreen();
-    } catch(e) {
-      // iOS native failed → CSS overlay fallback
-      overlay.classList.add('on');
-    }
+  // Desktop / Android: prefer overlay fullscreen so minibar can reappear properly
+  if(overlay.requestFullscreen){
+    overlay.classList.add('on');
+    overlay.requestFullscreen().catch(()=>{});
+    v.play().catch(()=>{});
+    return;
+  }
+  if(overlay.webkitRequestFullscreen){
+    overlay.classList.add('on');
+    overlay.webkitRequestFullscreen();
+    v.play().catch(()=>{});
     return;
   }
 
-  // Desktop: fullscreen the OVERLAY (includes topbar + video)
-  // This way quality/audio/subtitle buttons stay visible
-  overlay.classList.add('on');
-  if(overlay.requestFullscreen){
-    overlay.requestFullscreen().catch(()=>{
-      // Already showing CSS overlay from .on above
-    });
-  }else if(overlay.webkitRequestFullscreen){
-    overlay.webkitRequestFullscreen();
-  }else if(v.requestFullscreen){
-    // Android fallback: fullscreen just the video
-    v.requestFullscreen().catch(()=>{});
-  }else if(v.webkitRequestFullscreen){
-    v.webkitRequestFullscreen();
+  // iPad/iPhone: use iOS-native fullscreen (best experience)
+  if(v.webkitEnterFullscreen){
+    var p=v.play();
+    if(p) p.catch(()=>{});
+    try { v.webkitEnterFullscreen(); } catch(e) { overlay.classList.add('on'); }
+    return;
   }
-  // CSS overlay is already visible (.on added above)
+
+  // Fallback: CSS overlay
+  overlay.classList.add('on');
   v.play().catch(()=>{});
 }
 
