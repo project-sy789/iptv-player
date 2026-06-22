@@ -335,6 +335,13 @@ body{
 .country-card .flag{font-size:32px;font-weight:800;margin-bottom:8px;width:56px;height:56px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;margin:0 auto 10px;color:var(--accent);border:2px solid var(--border)}
 .country-card .name{font-size:14px;font-weight:600}
 .country-card .count{font-size:12px;color:var(--dim);margin-top:4px}
+.smart-chips,.cat-tabs{display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:2px 0 14px;margin-bottom:12px}
+.smart-chips::-webkit-scrollbar,.cat-tabs::-webkit-scrollbar{display:none}
+.chip{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:999px;padding:9px 14px;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;flex-shrink:0}
+.chip:hover,.chip.on{border-color:var(--accent);color:var(--accent);background:rgba(240,160,48,.1)}
+.section-head{display:flex;align-items:end;justify-content:space-between;gap:12px;margin:18px 0 12px}
+.section-head h3{font-size:17px;margin:0}.section-head p{margin:3px 0 0;color:var(--dim);font-size:12px}
+.section-head button{background:transparent;border:none;color:var(--accent);cursor:pointer;font-size:13px;font-weight:700}
 
 /* Country code badge (replaces emoji flags) */
 .cc-badge{
@@ -556,6 +563,8 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
   .welcome{padding:16px}
   .welcome h2{font-size:18px}
   .welcome p{font-size:13px}
+  .chip{font-size:12px;padding:8px 12px}
+  .smart-chips,.cat-tabs{margin-left:-4px;margin-right:-4px;padding-bottom:10px}
   .login-box{padding:28px 20px}
   .login-box .icon{font-size:44px}
   .login-box h2{font-size:20px}
@@ -802,7 +811,12 @@ applyTheme();
 function setLang(l){
   LANG=l;try{localStorage.setItem('iptv_lang',l)}catch(e){}
   refreshLangUI();
-  if(ALL.length){if(currentView==='country')renderCountry(currentCountry);else goHome();}
+  if(ALL.length){
+    if(currentView==='country')renderCountry(currentCountry);
+    else if(currentView==='category')renderCategory(currentCountry,currentCategory);
+    else if(currentView==='search')renderSearchResults(($('searchInput').value||'').toLowerCase());
+    else goHome();
+  }
 }
 const T={
   loginTitle:{en:'IPTV Player',th:'เครื่องเล่น IPTV'},
@@ -894,7 +908,29 @@ const T={
   updateAvailBanner:{en:'🔄 New version! Update now',th:'🔄 มีเวอร์ชันใหม่! อัปเดตเลย'},
   updatePending:{en:'⏳ Updating…',th:'⏳ กำลังอัปเดต…'},
   prevChannel:{en:'Previous',th:'ช่องก่อน'},
-  nextChannel:{en:'Next',th:'ช่องถัดไป'}
+  nextChannel:{en:'Next',th:'ช่องถัดไป'},
+  theaterMode:{en:'🎛 Theater',th:'🎛 เธียเตอร์'},
+  nativeMode:{en:'⛶ Native',th:'⛶ เต็มจอระบบ'},
+  smartTitle:{en:'Smart Discovery',th:'ค้นหาแบบอัจฉริยะ'},
+  smartDesc:{en:'Start with country, category, favorites, recent, or HD channels.',th:'เริ่มจากประเทศ หมวดหมู่ ช่องโปรด ดูล่าสุด หรือช่อง HD'},
+  quickFilters:{en:'Quick Filters',th:'ตัวกรองด่วน'},
+  browseCountries:{en:'Browse Countries',th:'เลือกตามประเทศ'},
+  topCategories:{en:'Top Categories',th:'หมวดหมู่ยอดนิยม'},
+  allChannels:{en:'All Channels',th:'ช่องทั้งหมด'},
+  allCountries:{en:'All Countries',th:'ทุกประเทศ'},
+  allCategories:{en:'All Categories',th:'ทุกหมวดหมู่'},
+  showAll:{en:'View all',th:'ดูทั้งหมด'},
+  categoryFilter:{en:'Filter by country',th:'กรองตามประเทศ'},
+  catSports:{en:'⚽ Sports',th:'⚽ กีฬา'},
+  catNews:{en:'📰 News',th:'📰 ข่าว'},
+  catEntertainment:{en:'🎭 Entertainment',th:'🎭 บันเทิง'},
+  catMovies:{en:'🎬 Movies',th:'🎬 หนัง'},
+  catMusic:{en:'🎵 Music',th:'🎵 เพลง'},
+  catKids:{en:'🧒 Kids',th:'🧒 เด็ก'},
+  catDocumentary:{en:'🌿 Documentary',th:'🌿 สารคดี'},
+  catHD:{en:'📺 HD / 1080p',th:'📺 HD / 1080p'},
+  thaiChannels:{en:'🇹🇭 Thai Channels',th:'🇹🇭 ช่องไทย'},
+  categoryView:{en:'Category',th:'หมวดหมู่'}
 };
 const tn = (key, ...args) => {
   const v = T[key];
@@ -914,7 +950,12 @@ function refreshLangUI(){
   setText('refreshBtn',tn('refresh'));
   setText('testBtn',tn('test'));
   setText('logout-btn',tn('logout'));
-  setText('fullBtn',tn('fullscreen'));
+  setText('fullBtn',tn('theaterMode'));
+  setTitle('fullBtn',tn('theaterMode'));
+  setText('nativeFullBtn',tn('nativeMode'));
+  setTitle('nativeFullBtn',tn('nativeMode'));
+  setText('overlayNativeBtn',tn('nativeMode'));
+  setTitle('overlayNativeBtn',tn('nativeMode'));
   setText('castBtn',tn('cast'));
   setTitle('castBtn',tn('castTitle'));
   setText('airplayBtn',tn('airplay'));
@@ -1153,10 +1194,16 @@ function goCountry(cc){
   renderCountryList();
   renderCountry(cc);
 }
-function goCategory(cat){
+function goCategory(cat,cc){
   closeSidebar();
+  currentView='category';
   currentCategory=cat;
+  if(cc!==undefined)currentCountry=cc;
   renderCategory(currentCountry,cat);
+}
+function goGlobalCategory(cat){
+  currentCountry=null;
+  goCategory(cat,null);
 }
 
 function updateNavHighlight(){
@@ -1166,28 +1213,85 @@ function updateNavHighlight(){
 
 function $$(sel){return document.querySelectorAll(sel)}
 
+// ====== SMART FILTER HELPERS ======
+const SMART_CATS=['Sports','News','Entertainment','Movies','Music','Kids','Documentary'];
+function catKey(cat){
+  const k=String(cat||'').toLowerCase();
+  if(k==='sports')return'catSports';
+  if(k==='news')return'catNews';
+  if(k==='entertainment')return'catEntertainment';
+  if(k==='movies')return'catMovies';
+  if(k==='music')return'catMusic';
+  if(k==='kids')return'catKids';
+  if(k==='documentary')return'catDocumentary';
+  return'';
+}
+function catLabel(cat){const k=catKey(cat);return k?tn(k):('📂 '+esc(cat||tn('allCategories')));}
+function getCategoryChannels(cat,max,cc){
+  const r=[];
+  for(const ch of ALL){
+    if(cat&&ch.cat!==cat)continue;
+    if(cc&&ch.country!==cc)continue;
+    r.push(ch);if(max&&r.length>=max)break;
+  }
+  return r;
+}
+function getHdChannels(max,cc){
+  const r=[];
+  for(const ch of ALL){
+    if(cc&&ch.country!==cc)continue;
+    if(ch.quality&&parseInt(ch.quality)>=720){r.push(ch);if(max&&r.length>=max)break;}
+  }
+  return r;
+}
+function getCountriesForCategory(cat){
+  const m={};
+  for(const ch of ALL){if(ch.cat===cat&&ch.country)m[ch.country]=(m[ch.country]||0)+1;}
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([cc,n])=>({cc,count:n,flag:countryFlag(cc)}));
+}
+function renderSmartChips(cc){
+  let h='<div class="smart-chips">';
+  if(!cc)h+=`<button class="chip" onclick="goCountry('TH')">${tn('thaiChannels')}</button>`;
+  for(const cat of SMART_CATS)h+=`<button class="chip" onclick="${cc?`goCategory('${escAttr(cat)}','${cc}')`:`goGlobalCategory('${escAttr(cat)}')`}">${catLabel(cat)}</button>`;
+  h+=`<button class="chip" onclick="${cc?`renderCategory('${cc}','__HD__')`:`goGlobalCategory('__HD__')`}">${tn('catHD')}</button>`;
+  h+='</div>';
+  return h;
+}
+function renderCategoryTabs(cc,cats,active){
+  let h='<div class="cat-tabs">';
+  h+=`<button class="chip ${!active?'on':''}" onclick="goCountry('${cc}')">${tn('allChannels')}</button>`;
+  for(const [cat,chs] of cats){
+    const on=active===cat?'on':'';
+    h+=`<button class="chip ${on}" onclick="goCategory('${escAttr(cat)}','${cc}')">${catLabel(cat)} <span style="opacity:.6">${chs.length}</span></button>`;
+  }
+  h+=`<button class="chip ${active==='__HD__'?'on':''}" onclick="goCategory('__HD__','${cc}')">${tn('catHD')}</button>`;
+  h+='</div>';
+  return h;
+}
 // ====== RENDER: HOME ======
 function renderHome(){
   const q=($('searchInput').value||'').toLowerCase();
   if(q){renderSearchResults(q);return;}
   
   $('breadcrumb').innerHTML='<span>🏠 Home</span>';
-  $('chCount').textContent=ALL.length.toLocaleString()+' channels';
+  $('chCount').textContent=tn('chCount',ALL.length);
   
   let html='<div class="welcome">';
-  html+='<h2>'+tn('homeTitle')+'</h2>';
-  html+='<p>'+tn('homeDesc',ALL.length,Object.keys(DB).length)+'</p>';
+  html+='<h2>✨ '+tn('smartTitle')+'</h2>';
+  html+='<p>'+tn('smartDesc')+'</p>';
+  html+='<div class="section-head"><div><h3>'+tn('quickFilters')+'</h3><p>'+tn('homeDesc',ALL.length,Object.keys(DB).length)+'</p></div></div>';
+  html+=renderSmartChips(null);
+  html+='<div class="section-head"><div><h3>'+tn('browseCountries')+'</h3><p>'+tn('allCountries')+'</p></div></div>';
   html+='<div class="country-grid">';
-  for(const c of COUNTRY_LIST.slice(0,24)){
+  for(const c of COUNTRY_LIST.slice(0,18)){
     html+=`<div class="country-card" onclick="goCountry('${c.cc}')">
       <div class="flag">${c.flag||'??'}</div>
       <div class="name">${countryName(c.cc)}</div>
-      <div class="count">${c.count.toLocaleString()} channels</div>
+      <div class="count">${c.count.toLocaleString()} ${tn('channels')}</div>
     </div>`;
   }
   html+='</div></div>';
 
-  // 0. Recently Watched 🕐 (always first)
   const recent=getRecentlyWatched(20);
   if(recent.length>=1){
     html+='<div class="row-wrap"><div class="row-title">'+tn('recentRow')+' <span class="badge">'+tn('recentSub')+'</span>'
@@ -1196,45 +1300,34 @@ function renderHome(){
     html+='</div>';
   }
 
-  // 0.5. ❤️ Favorites
   const favs=getFavorites(20);
-  if(favs.length>=1){
-    html+='<div class="row-wrap"><div class="row-title">'+tn('favRow')+' <span class="badge">'+favs.length+' '+tn('channels')+'</span></div>';
-    html+=renderRowScroll(favs);
-    html+='</div>';
-  }
+  if(favs.length>=1){html+=renderRow(tn('favRow'),favs.length+' '+tn('channels'),favs);}
 
-  // 1. Featured (high quality, broader criteria)
-  const featured=ALL.filter(c=>c.quality&&parseInt(c.quality)>=720).slice(0,25);
-  if(featured.length>=5){
-    html+=renderRow(tn('featRow'),tn('featSub'),featured);
-  }
+  const thai=getCategoryChannels(null,25,'TH');
+  if(thai.length>=4)html+=renderRow(tn('thaiChannels'),thai.length+' '+tn('channels'),thai);
 
-  // 3. Popular categories with live channels
-  const popularCats=['Sports','News','Entertainment','Music','Movies','Kids','Documentary'];
-  for(const cat of popularCats){
-    const chs=getCatChannels(cat,25);
+  const featured=getHdChannels(25,null);
+  if(featured.length>=5)html+=renderRow(tn('catHD'),tn('featSub'),featured);
+
+  for(const cat of SMART_CATS){
+    const chs=getCategoryChannels(cat,25,null);
     if(chs.length>=4){
-      // Prefer alive channels first
       chs.sort((a,b)=>getStatus(a)==='alive'?-1:getStatus(b)==='alive'?1:0);
-      html+=renderRow('📺 '+cat,chs.length+' channels',chs);
+      html+=renderRow(catLabel(cat),chs.length+' '+tn('channels'),chs);
     }
   }
 
-  // 5. Remaining top categories
   const topCats=getTopCategories(8);
   for(const [cat,chs] of topCats){
-    if(popularCats.includes(cat))continue;
-    html+=renderRow('📂 '+cat,chs.length+' channels',chs.slice(0,25));
+    if(SMART_CATS.includes(cat))continue;
+    html+=renderRow(catLabel(cat),chs.length+' '+tn('channels'),chs.slice(0,25));
   }
   
   $('content').innerHTML=html;
   setTimeout(autoTestVisible,800);
 }
 
-function getCatChannels(cat,max){
-  const r=[];for(const ch of ALL){if(ch.cat===cat){r.push(ch);if(r.length>=max)break}}return r;
-}
+function getCatChannels(cat,max){return getCategoryChannels(cat,max,null);}
 
 // 🔧 Migration helper: old data used array indices; new data uses URL hashes
 function _migratePlays(){
@@ -1409,32 +1502,22 @@ var _countryCats=[],_countryCc='',_catsShown=6;
 function renderCountry(cc){
   const data=DB[cc];
   if(!data){goHome();return;}
-  _countryCc=cc;
-  _catsShown=6;
+  currentView='country';currentCountry=cc;currentCategory=null;
+  _countryCc=cc;_catsShown=6;
   
   $('breadcrumb').innerHTML='<span onclick="goHome()">🏠 Home</span><span class="sep">›</span><span>'+data.flag+' '+countryName(cc)+'</span>';
   
   const cats=Object.entries(data.categories).sort((a,b)=>b[1].length-a[1].length);
   _countryCats=cats;
   const total=cats.reduce((s,[,chs])=>s+chs.length,0);
-  $('chCount').textContent=total.toLocaleString()+' channels in '+countryName(cc);
+  $('chCount').textContent=tn('chIn',total,cc);
   
   let html='<div class="welcome">';
   html+='<h2>'+data.flag+' '+countryName(cc)+'</h2>';
-  html+='<p>'+total.toLocaleString()+' channels &middot; '+cats.length+' categories</p>';
-  
-  // Category quick links
-  html+='<div class="country-grid">';
-  for(const [cat,chs] of cats){
-    html+=`<div class="country-card" onclick="goCountry('${cc}');goCategory('${escAttr(cat)}')">
-      <div class="flag">📂</div>
-      <div class="name">${esc(cat)}</div>
-      <div class="count">${chs.length.toLocaleString()} channels</div>
-    </div>`;
-  }
-  html+='</div></div>';
-  
-  // Show first batch of category rows
+  html+='<p>'+total.toLocaleString()+' '+tn('channels')+' &middot; '+tn('categories',cats.length)+'</p>';
+  html+=renderSmartChips(cc);
+  html+=renderCategoryTabs(cc,cats,null);
+  html+='</div>';
   html+=_renderCountryRows();
   $('content').innerHTML=html;
   setTimeout(autoTestVisible,500);
@@ -1442,18 +1525,16 @@ function renderCountry(cc){
 function _renderCountryRows(){
   let h='';
   const batch=_countryCats.slice(_catsShown-6,_catsShown);
-  for(const [cat,chs] of batch){
-    h+=renderRow(cat,chs.length+' channels',chs.slice(0,30));
-  }
+  for(const [cat,chs] of batch){h+=renderRow(catLabel(cat),chs.length+' '+tn('channels'),chs.slice(0,30));}
   if(_catsShown<_countryCats.length){
     const remaining=_countryCats.length-_catsShown;
-    h+='<div style="text-align:center;padding:20px"><button onclick="loadMoreCountryCats()" style="background:var(--surface2);color:var(--accent);border:1px solid var(--border);padding:10px 28px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600">📂 Load '+Math.min(6,remaining)+' more categories ('+remaining+' remaining)</button></div>';
+    h+='<div id="loadMoreCatsWrap" style="text-align:center;padding:20px"><button onclick="loadMoreCountryCats()" style="background:var(--surface2);color:var(--accent);border:1px solid var(--border);padding:10px 28px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600">📂 '+tn('showAll')+' ('+remaining+')</button></div>';
   }
   return h;
 }
 function loadMoreCountryCats(){
   _catsShown+=6;
-  const btn=document.querySelector('#content button');
+  const btn=document.getElementById('loadMoreCatsWrap');
   if(btn)btn.remove();
   const more=_renderCountryRows();
   document.getElementById('content').insertAdjacentHTML('beforeend',more);
@@ -1462,14 +1543,39 @@ function loadMoreCountryCats(){
 
 // ====== RENDER: CATEGORY (grid view) ======
 function renderCategory(cc,cat){
-  const data=DB[cc];
-  if(!data||!data.categories[cat])return;
-  const chs=data.categories[cat];
-  
-  $('breadcrumb').innerHTML='<span onclick="goHome()">🏠 Home</span><span class="sep">›</span><span onclick="goCountry(\''+cc+'\')">'+data.flag+' '+countryName(cc)+'</span><span class="sep">›</span><span>'+esc(cat)+'</span>';
-  $('chCount').textContent=chs.length.toLocaleString()+' channels';
-  
-  let html='<div class="grid-view">';
+  currentView='category';currentCountry=cc||null;currentCategory=cat;
+  let chs=[];
+  let title='';
+  if(cat==='__HD__'){
+    chs=getHdChannels(null,cc||null);
+    title=tn('catHD');
+  }else{
+    chs=getCategoryChannels(cat,null,cc||null);
+    title=catLabel(cat);
+  }
+  if(!chs.length){
+    $('content').innerHTML='<div class="loading"><span class="emoji">📂</span>'+tn('noResults')+' '+esc(title)+'</div>';
+    return;
+  }
+  const countryPart=cc?'<span class="sep">›</span><span onclick="goCountry(\''+cc+'\')">'+countryFlag(cc)+' '+countryName(cc)+'</span>':'';
+  $('breadcrumb').innerHTML='<span onclick="goHome()">🏠 Home</span>'+countryPart+'<span class="sep">›</span><span>'+title+'</span>';
+  $('chCount').textContent=tn('chCount',chs.length);
+  let html='<div class="welcome">';
+  html+='<h2>'+title+'</h2>';
+  html+='<p>'+chs.length.toLocaleString()+' '+tn('channels')+(cc?' · '+countryName(cc):' · '+tn('allCountries'))+'</p>';
+  if(cc&&DB[cc]){
+    const cats=Object.entries(DB[cc].categories).sort((a,b)=>b[1].length-a[1].length);
+    html+=renderCategoryTabs(cc,cats,cat);
+  }else if(cat!=='__HD__'){
+    html+='<div class="section-head"><div><h3>'+tn('categoryFilter')+'</h3><p>'+tn('allCountries')+'</p></div></div><div class="cat-tabs">';
+    html+=`<button class="chip on" onclick="goGlobalCategory('${escAttr(cat)}')">${tn('allCountries')}</button>`;
+    for(const c of getCountriesForCategory(cat).slice(0,30)){
+      html+=`<button class="chip" onclick="goCategory('${escAttr(cat)}','${c.cc}')">${c.flag} ${countryName(c.cc)} <span style="opacity:.6">${c.count}</span></button>`;
+    }
+    html+='</div>';
+  }
+  html+='</div>';
+  html+='<div class="grid-view">';
   for(const ch of chs){
     const flag=countryFlag(ch.country);
     const playing=currentChannel&&currentChannel.name===ch.name&&currentChannel.url===ch.url;
@@ -1477,13 +1583,13 @@ function renderCategory(cc,cat){
     const qlClass=(!ch.quality||parseInt(ch.quality)<720)?'sd':'';
     const idx=ALL.indexOf(ch);
     const sd=statusDot(ch);
-    const logoHtml=ch.logo?`<img src="${esc(ch.logo)}" loading="lazy" onerror="this.style.display='none'" style="width:48px;height:48px;border-radius:8px;object-fit:contain;background:var(--surface2);flex-shrink:0" alt="">`:`<div class="thumb">${flag||'📺'}${sd}</div>`;
+    const logoHtml=ch.logo?`<img src="${esc(ch.logo)}" loading="lazy" onerror="this.style.display='none'" style="width:48px;height:48px;border-radius:8px;object-fit:contain;background:var(--surface2);flex-shrink:0" alt="">`:`<div class="thumb">${flag||'📺'}</div>`;
 
     html+=`<div class="${cls}" onclick="play(${idx})" tabindex="0" onkeydown="if(event.key==='Enter')play(${idx})">
       ${logoHtml}
       <div class="detail">
         <div class="nm">${esc(ch.name)}</div>
-        <div class="mt">${esc(ch.cat)}${ch.geo?' · 🔒':''}${ch.not247?' · ⏰':''}</div>
+        <div class="mt">${flag||''} ${esc(ch.cat)}${ch.geo?' · 🔒':''}${ch.not247?' · ⏰':''}${ch._src?` · ${esc(ch._src)}`:''}</div>
       </div>
       ${ch.quality?`<span class="ql-badge ${qlClass}">${ch.quality}</span>`:''}
       ${sd}
@@ -1500,7 +1606,7 @@ function renderSearchResults(q){
   $('breadcrumb').innerHTML='<span onclick="goHome()">🏠 Home</span><span class="sep">›</span><span>🔍 "'+esc(q)+'"</span>';
   
   const results=ALL.filter(ch=>{
-    const s=(ch.name+' '+ch.cat+' '+(ch.country||'')).toLowerCase();
+    const s=(ch.name+' '+ch.cat+' '+(ch.country||'')+' '+countryName(ch.country)+' '+(ch._src||'')+' '+(ch.quality||'')).toLowerCase();
     return s.includes(q);
   });
   
