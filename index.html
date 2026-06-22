@@ -1004,6 +1004,9 @@ function extractInfoStream(s){
     url:s.url||'',
     _src:'iptv-api'
   };
+}
+
+// ====== DATA LOADING ======
 async function loadData(){
   if(_dataLoaded)return;
   _dataLoaded=true;
@@ -1034,8 +1037,6 @@ async function loadData(){
   ALL=ch1;
   buildDB();
   goHome();
-  $('content').innerHTML='<div class="loading"><span class="emoji">⚙️</span>'+tn('parsing')+'</div>';
-  await sleep(10);
 
   // Load optional sources in the background, then merge and rerender
   setTimeout(async ()=>{
