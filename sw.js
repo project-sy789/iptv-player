@@ -1,6 +1,6 @@
-// 📺 IPTV Player — Service Worker v5
-// v5: 3-source merge (iptv-org M3U + Free-TV + streams.json API)
-const CACHE = 'iptv-player-v5';
+// 📺 IPTV Player — Service Worker v6
+// v6: 4-source merge (iptv-org M3U + Free-TV + streams.json API + Guovin)
+const CACHE = 'iptv-player-v6';
 const ASSETS = [
   '/iptv-player/',
   '/iptv-player/manifest.json',
