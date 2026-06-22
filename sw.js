@@ -1,6 +1,6 @@
-// 📺 IPTV Player — Service Worker v11
-// v11: v2.8.1 category filter fix
-const CACHE = 'iptv-player-v11';
+// 📺 IPTV Player — Service Worker v12
+// v12: v2.8.2 parser and refresh source fixes
+const CACHE = 'iptv-player-v12';
 const ASSETS = [
   '/iptv-player/',
   '/iptv-player/manifest.json',
