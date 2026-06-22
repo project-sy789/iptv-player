@@ -571,7 +571,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     </form>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
-    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.7.4</div>
+    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.7.5</div>
   </div>
 </div>
 
@@ -2429,7 +2429,7 @@ function testVisibleChannels(){
 var epgData = {};       // { channelId: { programs: [{start,stop,title}], _ts } }
 var epgLoadPromise = null;
 const EPG_KEY = 'iptv_epg_v2';
-const EPG_URL = 'https://worker-9dd4.onrender.com/guide.xml.gz';
+const EPG_URL = '';
 const EPG_TTL = 3 * 3600 * 1000; // 3h cache
 
 // Load EPG cache from localStorage

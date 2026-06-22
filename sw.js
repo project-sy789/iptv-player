@@ -1,6 +1,6 @@
-// 📺 IPTV Player — Service Worker v8
-// v8: disable CORS-blocked Guovin runtime fetch
-const CACHE = 'iptv-player-v8';
+// 📺 IPTV Player — Service Worker v9
+// v9: disable direct EPG fetch (CORS)
+const CACHE = 'iptv-player-v9';
 const ASSETS = [
   '/iptv-player/',
   '/iptv-player/manifest.json',
