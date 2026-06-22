@@ -1,6 +1,6 @@
-// 📺 IPTV Player — Service Worker v9
-// v9: disable direct EPG fetch (CORS)
-const CACHE = 'iptv-player-v9';
+// 📺 IPTV Player — Service Worker v10
+// v10: bump cache after v2.8.0 UX/version update
+const CACHE = 'iptv-player-v10';
 const ASSETS = [
   '/iptv-player/',
   '/iptv-player/manifest.json',
