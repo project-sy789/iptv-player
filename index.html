@@ -604,7 +604,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     </form>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
-    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.8.0</div>
+    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.8.1</div>
   </div>
 </div>
 
@@ -1227,11 +1227,12 @@ function catKey(cat){
   return'';
 }
 function catLabel(cat){const k=catKey(cat);return k?tn(k):('📂 '+esc(cat||tn('allCategories')));}
+function channelCountry(ch){return ch&&ch.country?ch.country:'??';}
 function getCategoryChannels(cat,max,cc){
   const r=[];
   for(const ch of ALL){
     if(cat&&ch.cat!==cat)continue;
-    if(cc&&ch.country!==cc)continue;
+    if(cc&&channelCountry(ch)!==cc)continue;
     r.push(ch);if(max&&r.length>=max)break;
   }
   return r;
@@ -1239,14 +1240,14 @@ function getCategoryChannels(cat,max,cc){
 function getHdChannels(max,cc){
   const r=[];
   for(const ch of ALL){
-    if(cc&&ch.country!==cc)continue;
+    if(cc&&channelCountry(ch)!==cc)continue;
     if(ch.quality&&parseInt(ch.quality)>=720){r.push(ch);if(max&&r.length>=max)break;}
   }
   return r;
 }
 function getCountriesForCategory(cat){
   const m={};
-  for(const ch of ALL){if(ch.cat===cat&&ch.country)m[ch.country]=(m[ch.country]||0)+1;}
+  for(const ch of ALL){if(ch.cat===cat){const cc=channelCountry(ch);m[cc]=(m[cc]||0)+1;}}
   return Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([cc,n])=>({cc,count:n,flag:countryFlag(cc)}));
 }
 function renderSmartChips(cc){

@@ -1,6 +1,6 @@
-// 📺 IPTV Player — Service Worker v10
-// v10: bump cache after v2.8.0 UX/version update
-const CACHE = 'iptv-player-v10';
+// 📺 IPTV Player — Service Worker v11
+// v11: v2.8.1 category filter fix
+const CACHE = 'iptv-player-v11';
 const ASSETS = [
   '/iptv-player/',
   '/iptv-player/manifest.json',
