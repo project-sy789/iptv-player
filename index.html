@@ -654,7 +654,8 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
   <button id="ccBtn" onclick="toggleSubtitle()" title="💬 CC" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px">💬</button>
   <button id="airplayBtn" onclick="toggleAirPlay()" title="📺 AirPlay" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px">📺</button>
   <button id="castBtn" onclick="toggleCast()" title="📡 Cast" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px">📡 แคสต์</button>
-  <button id="fullBtn" onclick="openFullscreen()">⛶ เต็มจอ</button>
+  <button id="fullBtn" onclick="enterTheaterMode()" title="Theater mode with quality controls">🎛 Theater</button>
+  <button id="nativeFullBtn" onclick="enterNativeFullscreen()" title="Native fullscreen (system controls)">⛶ Native</button>
   <button id="stopBtn" class="danger" onclick="stop()">✕</button>
 </div>
 
@@ -670,6 +671,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     <button id="overlayAirplayBtn" onclick="toggleAirPlay()" title="📺 AirPlay" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px">📺</button>
     <button id="overlayCastBtn" onclick="toggleCast()" title="📡 Cast" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px">📡 แคสต์</button>
     <button id="overlayPiPBtn" onclick="togglePiP()" title="🖼️ PiP" style="display:none;background:#222;color:#fff;border:1px solid #444;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px">🖼️</button>
+    <button id="overlayNativeBtn" onclick="enterNativeFullscreen()" title="Native fullscreen (system controls)" style="background:#222;color:#fff;border:1px solid #444;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px">⛶ Native</button>
     <button id="overlayCloseBtn" onclick="closeFullscreen()">⬇ ย่อ</button>
     <button id="overlayStopBtn" onclick="fullStop()" style="background:#e04040">✕ หยุด</button>
   </div>
@@ -1590,7 +1592,7 @@ function playUrl(url){
   $('barSub').textContent=ch.cat;
   $('player-bar').classList.add('on');
   initPlayer(ch);
-  openFullscreen();
+  enterTheaterMode();
 }
 
 // ====== SEARCH ======
@@ -1607,6 +1609,7 @@ function debounceSearch(){
 
 // ====== PLAYER ======
 function isMobile(){return /Android|iPhone|iPad|iPod|webOS/i.test(navigator.userAgent)||window.innerWidth<768}
+var playerMode='inline'; // inline | theater | native
 
 function play(idx){
   const ch=ALL[idx];
@@ -1628,8 +1631,8 @@ function play(idx){
   showPiPButton();
   loadEpgForChannel(ch);
   
-  // Auto fullscreen — called from click handler so user gesture is preserved
-  openFullscreen();
+  // Smart default: open our Theater Mode so quality/audio/subtitle controls remain available.
+  enterTheaterMode();
 }
 
 function initPlayer(ch){
@@ -1783,63 +1786,78 @@ function stop(){
   const v=$('video');
   v.removeAttribute('src');
   v.src='';
+  v.controls=true;
   v.load(); // hard reset MediaSource
   v.style.display=''; // ensure visible for next play
   currentChannel=null;
+  playerMode='inline';
   resetPlayerUIs();
   $('player-bar').classList.remove('on');
   ['barHeart','overlayHeart'].forEach(id=>{const b=$(id);if(b){b.textContent='🤍';b.classList.remove('on');}});
   $('player-overlay').classList.remove('on');
   document.querySelectorAll('.card.playing').forEach(c=>c.classList.remove('playing'));
 }
-function openFullscreen(){
+
+function enterTheaterMode(){
   if(!currentChannel)return;
   const v=$('video');
   const overlay=$('player-overlay');
-
-  // Always show overlay first so video has a visible compositing surface.
-  // This prevents black-screen/audio-only issues and keeps quality/audio controls visible.
+  playerMode='theater';
+  // Smart default: keep our app controls visible for quality/audio/subtitles.
   overlay.classList.add('on');
+  overlay.classList.remove('native-mode');
+  v.controls=false;
+  v.playsInline=true;
+  v.setAttribute('playsinline','');
   v.play().catch(()=>{});
-
-  // iPhone/iPad: prefer CSS overlay so the app minibar/quality controls stay visible.
-  // Native webkitEnterFullscreen hides all custom controls, so only use it as a last resort.
-  if(v.webkitEnterFullscreen && !overlay.requestFullscreen && !overlay.webkitRequestFullscreen){
-    return;
-  }
-
-  // Desktop / Android / TV: fullscreen the overlay container (not the video), so topbar remains visible.
-  if(overlay.requestFullscreen){
-    overlay.requestFullscreen().catch(()=>{});
-    return;
-  }
-  if(overlay.webkitRequestFullscreen){
-    try{overlay.webkitRequestFullscreen();}catch(e){}
-    return;
-  }
 }
+
+function enterNativeFullscreen(){
+  if(!currentChannel)return;
+  const v=$('video');
+  playerMode='native';
+  v.controls=true;
+  v.play().catch(()=>{});
+  // Native mode is explicit only. It may hide custom quality controls, so never auto-enter it.
+  if(v.webkitEnterFullscreen){
+    try{v.webkitEnterFullscreen();return;}catch(e){}
+  }
+  if(v.requestFullscreen){
+    v.requestFullscreen().catch(()=>{});return;
+  }
+  if(v.webkitRequestFullscreen){
+    try{v.webkitRequestFullscreen();return;}catch(e){}
+  }
+  // Last resort: stay in theater if native is unavailable.
+  enterTheaterMode();
+}
+
+// Backward-compatible alias for old buttons/shortcuts.
+function openFullscreen(){enterTheaterMode();}
 
 // Listen for native fullscreen exit
 function onFullscreenChange(){
   if(!document.fullscreenElement&&!document.webkitFullscreenElement){
-    // Exited native fullscreen: keep CSS overlay while playback is active so controls remain available.
-    if(currentChannel){$('player-overlay').classList.add('on');}
-    else{$('player-overlay').classList.remove('on');}
+    // Native/system fullscreen ended. Return to Theater Mode so quality controls are available again.
+    if(currentChannel){enterTheaterMode();}
+    else{$('player-overlay').classList.remove('on');playerMode='inline';}
   }
 }
 document.addEventListener('fullscreenchange',onFullscreenChange);
 document.addEventListener('webkitfullscreenchange',onFullscreenChange);
+$('video').addEventListener('webkitendfullscreen',function(){
+  if(currentChannel){enterTheaterMode();}
+  else{playerMode='inline';}
+});
 
 function closeFullscreen(){
-  // Exit native fullscreen if active (iOS or desktop)
+  // Exit native/system fullscreen if active, then hide Theater overlay.
   if(document.fullscreenElement||document.webkitFullscreenElement){
-    if(document.exitFullscreen){
-      document.exitFullscreen().catch(()=>{});
-    }else if(document.webkitExitFullscreen){
-      document.webkitExitFullscreen();
-    }
+    if(document.exitFullscreen){document.exitFullscreen().catch(()=>{});}
+    else if(document.webkitExitFullscreen){document.webkitExitFullscreen();}
   }
-  // Remove CSS overlay — onFullscreenChange will also do this when exit completes
+  playerMode='inline';
+  $('video').controls=true;
   $('player-overlay').classList.remove('on');
 }
 
