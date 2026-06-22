@@ -571,7 +571,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     </form>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
-    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.7.2</div>
+    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.7.3</div>
   </div>
 </div>
 
@@ -719,6 +719,9 @@ const STREAMS_TS = 'iptv_streams_ts_v1';
 const GUVI_M3U_URL = 'https://guovern-iptv-api.onrender.com/m3u';
 const GUVI_CACHE = 'iptv_guovi_v1';
 const GUVI_TS = 'iptv_guovi_ts_v1';
+const BDIX_M3U_URL = 'https://raw.githubusercontent.com/abusaeeidx/Mrgify-BDIX-IPTV/master/playlist.m3u';
+const BDIX_CACHE = 'iptv_bdix_v1';
+const BDIX_TS = 'iptv_bdix_ts_v1';
 const CACHE_TTL = 6 * 3600 * 1000;
 
 // ====== HELPERS ======
@@ -1052,6 +1055,22 @@ async function loadData(){
     }catch(e){/* Guovin optional */}
   }
 
+  // ── Load BDIX playlist (quinary) ──
+  let raw5=null;
+  try{
+    const c5=localStorage.getItem(BDIX_CACHE),t5=localStorage.getItem(BDIX_TS);
+    if(c5&&t5&&Date.now()-parseInt(t5)<CACHE_TTL){raw5=c5;}
+  }catch(e){}
+  if(!raw5){
+    try{
+      const r5=await fetch(BDIX_M3U_URL,{cache:'no-cache'});
+      if(r5.ok){
+        raw5=await r5.text();
+        try{localStorage.setItem(BDIX_CACHE,raw5);localStorage.setItem(BDIX_TS,Date.now().toString())}catch(e){}
+      }
+    }catch(e){/* BDIX optional */}
+  }
+
   $('content').innerHTML='<div class="loading"><span class="emoji">⚙️</span>'+tn('parsing')+'</div>';
   await sleep(10);
 
@@ -1084,12 +1103,21 @@ async function loadData(){
     }catch(e){}
   }
 
+  // ── Parse BDIX ──
+  let ch5=[];
+  if(raw5){
+    try{
+      const entries5=parseM3U(raw5);
+      ch5=entries5.map(extractInfo);
+    }catch(e){}
+  }
+
   // ── Merge: deduplicate by URL, prefer richer metadata ──
   const seen=new Map(); // url → channel
   for(const ch of ch1){
     if(ch.url)seen.set(ch.url,ch);
   }
-  let newFromFT=0, upgraded=0, newFromAPI=0, newFromGuovin=0;
+  let newFromFT=0, upgraded=0, newFromAPI=0, newFromGuovin=0, newFromBDIX=0;
   for(const ch of ch2){
     if(!ch.url)continue;
     const existing=seen.get(ch.url);
@@ -1130,6 +1158,21 @@ async function loadData(){
       newFromGuovin++;
     }
   }
+  for(const ch of ch5){
+    if(!ch.url)continue;
+    const existing=seen.get(ch.url);
+    if(existing){
+      let better=false;
+      if(ch.logo&&!existing.logo){existing.logo=ch.logo;better=true;}
+      if(ch.tvgId&&!existing.tvgId){existing.tvgId=ch.tvgId;better=true;}
+      if(ch.country&&!existing.country){existing.country=ch.country;better=true;}
+      if(ch.quality&&!existing.quality){existing.quality=ch.quality;better=true;}
+      if(better)upgraded++;
+    }else{
+      seen.set(ch.url,ch);
+      newFromBDIX++;
+    }
+  }
   ALL=Array.from(seen.values());
 
   buildDB();
@@ -1138,6 +1181,7 @@ async function loadData(){
   if(newFromFT)msgs.push('+'+newFromFT+' Free-TV');
   if(newFromAPI)msgs.push('+'+newFromAPI+' API');
   if(newFromGuovin)msgs.push('+'+newFromGuovin+' Guovin');
+  if(newFromBDIX)msgs.push('+'+newFromBDIX+' BDIX');
   if(upgraded)msgs.push('✨ '+upgraded+' upgraded');
   if(msgs.length)setTimeout(()=>toast('🆕 '+msgs.join(', ')),1500);
 }
