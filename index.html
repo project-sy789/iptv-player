@@ -55,9 +55,20 @@ body{
   overflow-y:auto;
   overflow-x:hidden;
   -webkit-font-smoothing:antialiased;
+  width:100%;
+  overscroll-behavior:none;
 }
+#main{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  overflow:visible;
+  position:relative;
+  min-width:0;
+  width:100%;
+}
+#content{flex:1;overflow-y:auto;padding-bottom:80px;-webkit-overflow-scrolling:touch;min-width:0;overflow-x:hidden}
 
-/* === SIDEBAR === */
 #sidebar{
   width:var(--sidebar-w);
   background:var(--surface);
@@ -395,21 +406,26 @@ body{
 #player-overlay{
   position:fixed;inset:0;background:#000;z-index:200;
   display:none;flex-direction:column;
+  width:100vw;height:100dvh;
+  padding-top:env(safe-area-inset-top);
+  padding-bottom:env(safe-area-inset-bottom);
+  padding-left:env(safe-area-inset-left);
+  padding-right:env(safe-area-inset-right);
+  overflow:hidden;
 }
-#player-overlay.on{display:flex}
 #player-overlay .topbar{
   padding:10px 20px;display:flex;align-items:center;gap:12px;
   background:#0a0a0a;border-bottom:1px solid #222;
+  flex-shrink:0;min-width:0;
 }
-#player-overlay .topbar .tname{font-weight:600;font-size:14px;flex:1}
+#player-overlay .topbar .tname{font-weight:600;font-size:14px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #player-overlay .topbar button{
   background:#222;color:#fff;border:none;
   padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;
+  flex-shrink:0;
 }
-#player-overlay .topbar button:hover{background:#444}
-/* Subtitle/caption styling */
-video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-serif;font-size:1.1em;text-shadow:0 1px 2px #000;line-height:1.4}
-#player-overlay video{flex:1;width:100%;max-height:calc(100vh - 56px);background:#000}
+#player-overlay video{flex:1;width:100%;height:100%;min-height:0;max-height:none;background:#000;object-fit:contain}
+
 
 /* Toast */
 .toast{
@@ -501,22 +517,24 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     background:rgba(0,0,0,.5);
   }
   #sidebar-overlay.show{display:block}
-  #main{margin-left:0}
-  #player-bar{left:0;padding:0 10px;gap:8px}
+  #main{margin-left:0;min-width:0;width:100%;overflow-x:hidden}
+  #content{min-width:0;overflow-x:hidden}
+  #player-bar{left:0;padding:0 10px;gap:8px;min-width:0}
   #player-bar.on{height:56px}
   #player-bar .thumb{width:34px;height:34px;font-size:18px}
+  #player-bar .info{min-width:0}
   #player-bar .info .nm{font-size:12px}
   #player-bar .info .sub{font-size:10px}
-  #player-bar button{padding:5px 10px;font-size:11px}
-  #topbar{padding:8px 10px 8px 50px;gap:6px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  #player-bar button{padding:5px 10px;font-size:11px;flex-shrink:0}
+  #topbar{padding:8px 10px 8px 50px;gap:6px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;min-width:0}
   #topbar::-webkit-scrollbar{display:none}
-  #topbar .breadcrumb{font-size:12px}
-  #topbar .stats{font-size:11px}
-  #topbar select{font-size:11px;padding:5px 8px}
-  #topbar button{font-size:10px!important;padding:4px 8px!important;white-space:nowrap}
-  #logout-btn{font-size:10px!important;padding:4px 8px!important;white-space:nowrap}
-  #langToggle{font-size:10px!important}
-  #themeToggle{font-size:12px!important}
+  #topbar .breadcrumb{font-size:12px;min-width:0;white-space:nowrap}
+  #topbar .stats{font-size:11px;flex-shrink:0}
+  #topbar select{font-size:11px;padding:5px 8px;flex-shrink:0}
+  #topbar button{font-size:10px!important;padding:4px 8px!important;white-space:nowrap;flex-shrink:0}
+  #logout-btn{font-size:10px!important;padding:4px 8px!important;white-space:nowrap;flex-shrink:0}
+  #langToggle{font-size:10px!important;flex-shrink:0}
+  #themeToggle{font-size:12px!important;flex-shrink:0}
   #search input{font-size:12px;padding:8px 10px}
   .country-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
   .country-card{padding:14px}
@@ -524,7 +542,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
   .country-card .name{font-size:12px}
   .country-card .count{font-size:11px}
   .grid-view{grid-template-columns:1fr;gap:6px;padding:12px}
-  .grid-view .card{padding:10px}
+  .grid-view .card{padding:10px;min-width:0}
   .row-wrap{margin-bottom:20px}
   .row-wrap .row-title{font-size:15px;padding:0 12px}
   .row-scroll{padding:0 12px;gap:8px}
@@ -544,15 +562,18 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
   #sidebar nav button{font-size:12px;padding:8px 10px}
   #sidebar .logo{font-size:17px;padding:14px 14px 10px}
 }
-@media(max-width:480px){
-  .country-grid{grid-template-columns:repeat(2,1fr);gap:6px}
-  .country-card{padding:12px}
-  .country-card .flag{width:36px;height:36px;font-size:20px}
-  .row-scroll .card{width:130px}
-  .row-scroll .card .poster{height:72px}
-  #topbar button{margin-left:0!important}
-  #logout-btn{margin-left:0!important}
-  .cc-badge{width:18px;height:18px;font-size:9px}
+@media(min-width:1600px) and (min-height:900px){
+  :root{--sidebar-w:280px}
+  #sidebar{width:280px}
+  #topbar{padding:16px 28px;gap:18px}
+  #topbar .title{font-size:20px}
+  .grid-view{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+  .country-grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+  .row-scroll .card{width:240px}
+  .row-scroll .card .poster{height:132px}
+  .row-scroll .card .info .name{font-size:14px}
+  #player-bar{height:0}
+  #player-bar.on{height:68px}
 }
 
 </style>
