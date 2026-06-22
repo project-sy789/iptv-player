@@ -305,8 +305,8 @@ body{
   background:#1e3a5f;color:#60a5fa;flex-shrink:0;
 }
 .grid-view .card .ql-badge.sd{background:#3a1e1e;color:#f87171}
+.src-badge{display:inline-block;margin-left:6px;padding:2px 6px;border-radius:999px;background:rgba(240,160,48,.18);color:var(--accent);font-size:10px;font-weight:700;vertical-align:middle;border:1px solid rgba(240,160,48,.35)}
 
-/* Welcome / Country grid */
 .welcome{padding:24px}
 .welcome h2{font-size:24px;margin-bottom:8px}
 .welcome p{color:var(--dim);margin-bottom:24px;line-height:1.6}
@@ -722,6 +722,9 @@ const GUVI_TS = 'iptv_guovi_ts_v1';
 const BDIX_M3U_URL = 'https://raw.githubusercontent.com/abusaeeidx/Mrgify-BDIX-IPTV/master/playlist.m3u';
 const BDIX_CACHE = 'iptv_bdix_v1';
 const BDIX_TS = 'iptv_bdix_ts_v1';
+const AKKRADET_URL = 'https://raw.githubusercontent.com/akkradet/IPTV-THAI/main/FREETV.m3u';
+const AKKRADET_CACHE = 'iptv_akkradet_v1';
+const AKKRADET_TS = 'iptv_akkradet_ts_v1';
 const CACHE_TTL = 6 * 3600 * 1000;
 
 // ====== HELPERS ======
@@ -1071,8 +1074,21 @@ async function loadData(){
     }catch(e){/* BDIX optional */}
   }
 
-  $('content').innerHTML='<div class="loading"><span class="emoji">⚙️</span>'+tn('parsing')+'</div>';
-  await sleep(10);
+  // ── Load akkradet/IPTV-THAI playlist (senary) ──
+  let raw6=null;
+  try{
+    const c6=localStorage.getItem(AKKRADET_CACHE),t6=localStorage.getItem(AKKRADET_TS);
+    if(c6&&t6&&Date.now()-parseInt(t6)<CACHE_TTL){raw6=c6;}
+  }catch(e){}
+  if(!raw6){
+    try{
+      const r6=await fetch(AKKRADET_URL,{cache:'no-cache'});
+      if(r6.ok){
+        raw6=await r6.text();
+        try{localStorage.setItem(AKKRADET_CACHE,raw6);localStorage.setItem(AKKRADET_TS,Date.now().toString())}catch(e){}
+      }
+    }catch(e){/* akkradet optional */}
+  }
 
   // ── Parse iptv-org ──
   const entries1=parseM3U(raw1);
@@ -1117,7 +1133,7 @@ async function loadData(){
   for(const ch of ch1){
     if(ch.url)seen.set(ch.url,ch);
   }
-  let newFromFT=0, upgraded=0, newFromAPI=0, newFromGuovin=0, newFromBDIX=0;
+  let newFromFT=0, upgraded=0, newFromAPI=0, newFromGuovin=0, newFromBDIX=0, newFromAkkradet=0;
   for(const ch of ch2){
     if(!ch.url)continue;
     const existing=seen.get(ch.url);
@@ -1173,16 +1189,36 @@ async function loadData(){
       newFromBDIX++;
     }
   }
+  for(const ch of ch6){
+    if(!ch.url)continue;
+    const existing=seen.get(ch.url);
+    if(existing){
+      let better=false;
+      if(ch.logo&&!existing.logo){existing.logo=ch.logo;better=true;}
+      if(ch.tvgId&&!existing.tvgId){existing.tvgId=ch.tvgId;better=true;}
+      if(ch.country&&!existing.country){existing.country=ch.country;better=true;}
+      if(ch.quality&&!existing.quality){existing.quality=ch.quality;better=true;}
+      if(better)upgraded++;
+    }else{
+      seen.set(ch.url,ch);
+      newFromAkkradet++;
+    }
+  }
   ALL=Array.from(seen.values());
 
   buildDB();
   goHome();
+  var sourceCounts={};
+  for(const ch of ALL){sourceCounts[ch._src||'unknown']=(sourceCounts[ch._src||'unknown']||0)+1;}
   var msgs=[];
   if(newFromFT)msgs.push('+'+newFromFT+' Free-TV');
   if(newFromAPI)msgs.push('+'+newFromAPI+' API');
   if(newFromGuovin)msgs.push('+'+newFromGuovin+' Guovin');
   if(newFromBDIX)msgs.push('+'+newFromBDIX+' BDIX');
+  if(newFromAkkradet)msgs.push('+'+newFromAkkradet+' akkradet');
   if(upgraded)msgs.push('✨ '+upgraded+' upgraded');
+  var srcMsg=Object.entries(sourceCounts).map(([k,v])=>k+':'+v).join(' | ');
+  if(srcMsg)msgs.push('🧩 '+srcMsg);
   if(msgs.length)setTimeout(()=>toast('🆕 '+msgs.join(', ')),1500);
 }
 function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
@@ -1653,7 +1689,7 @@ function renderRowScroll(channels, playCounts){
       </div>
       <div class="info">
         <div class="name">${esc(ch.name)}</div>
-        <div class="meta">${flag||''} ${esc(ch.cat||'')}${ch.geo?' 🔒':''}${ch._stale?' · ⚠️':''}</div>
+        <div class="meta">${flag||''} ${esc(ch.cat||'')}${ch.geo?' 🔒':''}${ch._stale?' · ⚠️':''}${ch._src?` <span class="src-badge">${esc(ch._src)}</span>`:''}</div>
       </div>
     </div>`;
   }
@@ -2020,7 +2056,7 @@ function closeSidebar(){
 // ====== REFRESH ======
 async function refreshData(){
   $('chCount').textContent='Refreshing...';
-  toast('🔄 Fetching latest from 4 sources...');
+  toast('🔄 Fetching latest from 5 sources...');
   try{
     // Refresh iptv-org M3U
     const r1=await fetch(M3U_URL,{cache:'no-cache'});
@@ -2062,14 +2098,26 @@ async function refreshData(){
       }
     }catch(e){}
 
-    // Parse & merge all 4 sources
+    // Refresh akkradet/IPTV-THAI
+    let raw5=null;
+    try{
+      const r5=await fetch(AKKRADET_URL,{cache:'no-cache'});
+      if(r5.ok){
+        raw5=await r5.text();
+        localStorage.setItem(AKKRADET_CACHE,raw5);
+        localStorage.setItem(AKKRADET_TS,Date.now().toString());
+      }
+    }catch(e){}
+
+    // Parse & merge all 5 sources
     const ch1=parseM3U(raw1).map(extractInfo);
     const ch2=raw2?parseM3U(raw2).map(extractInfoFreeTV):[];
     let ch3=[];if(raw3){try{ch3=JSON.parse(raw3).map(extractInfoStream)}catch(e){}}
     const ch4=raw4?parseM3U(raw4).map(extractInfo):[];
+    const ch5=raw5?parseM3U(raw5).map(extractInfoFreeTV):[];
     const seen=new Map();
     for(const ch of ch1){if(ch.url)seen.set(ch.url,ch);}
-    let newFromFT=0, newFromAPI=0, newFromGuovin=0, upgraded=0;
+    let newFromFT=0, newFromAPI=0, newFromGuovin=0, newFromAkkradet=0, upgraded=0;
     for(const ch of ch2){
       if(!ch.url)continue;
       const ex=seen.get(ch.url);
@@ -2101,6 +2149,18 @@ async function refreshData(){
         if(better)upgraded++;
       }else{seen.set(ch.url,ch);newFromGuovin++;}
     }
+    for(const ch of ch5){
+      if(!ch.url)continue;
+      const ex=seen.get(ch.url);
+      if(ex){
+        let better=false;
+        if(ch.logo&&!ex.logo){ex.logo=ch.logo;better=true;}
+        if(ch.tvgId&&!ex.tvgId){ex.tvgId=ch.tvgId;better=true;}
+        if(ch.country&&!ex.country){ex.country=ch.country;better=true;}
+        if(ch.quality&&!ex.quality){ex.quality=ch.quality;better=true;}
+        if(better)upgraded++;
+      }else{seen.set(ch.url,ch);newFromAkkradet++;}
+    }
     ALL=Array.from(seen.values());
     buildDB();
     $('lastUpdate').textContent=tn('updated');
@@ -2111,6 +2171,7 @@ async function refreshData(){
     if(newFromFT)msgs.push('+'+newFromFT+' Free-TV');
     if(newFromAPI)msgs.push('+'+newFromAPI+' API');
     if(newFromGuovin)msgs.push('+'+newFromGuovin+' Guovin');
+    if(newFromAkkradet)msgs.push('+'+newFromAkkradet+' akkradet');
     if(upgraded)msgs.push('✨ '+upgraded+' upgraded');
     toast('✅ '+msgs.join(', '));
   }catch(e){
