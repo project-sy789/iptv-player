@@ -1561,7 +1561,6 @@ function renderRowScroll(channels, playCounts){
     
     h+=`<div class="${cls}" onclick="${clickHandler}" tabindex="0" onkeydown="if(event.key==='Enter')${clickHandler}">
       <div class="poster">
-        ${ch.geo?'<div class="live-dot" style="background:#e04040;box-shadow:0 0 6px #e04040"></div>':''}
         ${sd}
         ${logoHtml}
         ${ch.quality?`<span class="ql-badge">${ch.quality}</span>`:''}
