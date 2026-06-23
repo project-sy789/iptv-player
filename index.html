@@ -604,7 +604,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     </form>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
-    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.8.2</div>
+    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.8.3</div>
   </div>
 </div>
 
@@ -739,6 +739,7 @@ var currentChannel = null;
 var currentView = 'home'; // 'home' | 'country' | 'category' | 'search'
 var currentCountry = null;
 var currentCategory = null;
+var currentSource = null;
 var filterTimer = null;
 var _dataLoaded = false;
 
@@ -814,6 +815,7 @@ function setLang(l){
   if(ALL.length){
     if(currentView==='country')renderCountry(currentCountry);
     else if(currentView==='category')renderCategory(currentCountry,currentCategory);
+    else if(currentView==='source')renderSource(currentSource);
     else if(currentView==='search')renderSearchResults(($('searchInput').value||'').toLowerCase());
     else goHome();
   }
@@ -930,7 +932,10 @@ const T={
   catDocumentary:{en:'🌿 Documentary',th:'🌿 สารคดี'},
   catHD:{en:'📺 HD / 1080p',th:'📺 HD / 1080p'},
   thaiChannels:{en:'🇹🇭 Thai Channels',th:'🇹🇭 ช่องไทย'},
-  categoryView:{en:'Category',th:'หมวดหมู่'}
+  categoryView:{en:'Category',th:'หมวดหมู่'},
+  sourceFilter:{en:'Source Filters',th:'กรองตามแหล่งที่มา'},
+  allSources:{en:'All Sources',th:'ทุกแหล่ง'},
+  sourceView:{en:'Source',th:'แหล่งที่มา'}
 };
 const tn = (key, ...args) => {
   const v = T[key];
@@ -1187,7 +1192,7 @@ function renderCountryList(){
 
 // ====== NAVIGATION ======
 function goHome(){
-  currentView='home';currentCountry=null;currentCategory=null;
+  currentView='home';currentCountry=null;currentCategory=null;currentSource=null;
   $('searchInput').value='';
   closeSidebar();
   updateNavHighlight();
@@ -1211,6 +1216,11 @@ function goCategory(cat,cc){
 function goGlobalCategory(cat){
   currentCountry=null;
   goCategory(cat,null);
+}
+function goSource(src){
+  closeSidebar();
+  currentView='source';currentSource=src;currentCountry=null;currentCategory=null;
+  renderSource(src);
 }
 
 function updateNavHighlight(){
@@ -1257,6 +1267,27 @@ function getCountriesForCategory(cat){
   for(const ch of ALL){if(ch.cat===cat){const cc=channelCountry(ch);m[cc]=(m[cc]||0)+1;}}
   return Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([cc,n])=>({cc,count:n,flag:countryFlag(cc)}));
 }
+function getSourceChannels(src,max){
+  const r=[];
+  for(const ch of ALL){
+    if((ch._src||'unknown')!==src)continue;
+    r.push(ch);if(max&&r.length>=max)break;
+  }
+  return r;
+}
+function getSourceCounts(){
+  const m={};
+  for(const ch of ALL){const s=ch._src||'unknown';m[s]=(m[s]||0)+1;}
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([src,count])=>({src,count}));
+}
+function renderSourceChips(){
+  const list=getSourceCounts();
+  if(!list.length)return'';
+  let h='<div class="section-head"><div><h3>'+tn('sourceFilter')+'</h3><p>'+tn('allSources')+'</p></div></div><div class="smart-chips">';
+  for(const s of list){h+=`<button class="chip" onclick="goSource('${escAttr(s.src)}')">🧩 ${esc(s.src)} <span style="opacity:.6">${s.count}</span></button>`;}
+  h+='</div>';
+  return h;
+}
 function renderSmartChips(cc){
   let h='<div class="smart-chips">';
   if(!cc)h+=`<button class="chip" onclick="goCountry('TH')">${tn('thaiChannels')}</button>`;
@@ -1289,6 +1320,7 @@ function renderHome(){
   html+='<p>'+tn('smartDesc')+'</p>';
   html+='<div class="section-head"><div><h3>'+tn('quickFilters')+'</h3><p>'+tn('homeDesc',ALL.length,Object.keys(DB).length)+'</p></div></div>';
   html+=renderSmartChips(null);
+  html+=renderSourceChips();
   html+='<div class="section-head"><div><h3>'+tn('browseCountries')+'</h3><p>'+tn('allCountries')+'</p></div></div>';
   html+='<div class="country-grid">';
   for(const c of COUNTRY_LIST.slice(0,18)){
@@ -1593,6 +1625,44 @@ function renderCategory(cc,cat){
     const sd=statusDot(ch);
     const logoHtml=ch.logo?`<img src="${esc(ch.logo)}" loading="lazy" onerror="this.style.display='none'" style="width:48px;height:48px;border-radius:8px;object-fit:contain;background:var(--surface2);flex-shrink:0" alt="">`:`<div class="thumb">${flag||'📺'}</div>`;
 
+    html+=`<div class="${cls}" onclick="play(${idx})" tabindex="0" onkeydown="if(event.key==='Enter')play(${idx})">
+      ${logoHtml}
+      <div class="detail">
+        <div class="nm">${esc(ch.name)}</div>
+        <div class="mt">${flag||''} ${esc(ch.cat)}${ch.geo?' · 🔒':''}${ch.not247?' · ⏰':''}${ch._src?` · ${esc(ch._src)}`:''}</div>
+      </div>
+      ${ch.quality?`<span class="ql-badge ${qlClass}">${ch.quality}</span>`:''}
+      ${sd}
+    </div>`;
+  }
+  html+='</div>';
+  $('content').innerHTML=html;
+  setTimeout(autoTestVisible,500);
+}
+
+
+function renderSource(src){
+  currentView='source';currentSource=src;
+  const chs=getSourceChannels(src,null);
+  $('breadcrumb').innerHTML='<span onclick="goHome()">🏠 Home</span><span class="sep">›</span><span>🧩 '+tn('sourceView')+': '+esc(src)+'</span>';
+  $('chCount').textContent=tn('chCount',chs.length);
+  if(!chs.length){
+    $('content').innerHTML='<div class="loading"><span class="emoji">🧩</span>'+tn('noResults')+' '+esc(src)+'</div>';
+    return;
+  }
+  let html='<div class="welcome">';
+  html+='<h2>🧩 '+tn('sourceView')+': '+esc(src)+'</h2>';
+  html+='<p>'+chs.length.toLocaleString()+' '+tn('channels')+'</p>';
+  html+=renderSourceChips();
+  html+='</div><div class="grid-view">';
+  for(const ch of chs){
+    const flag=countryFlag(ch.country);
+    const playing=currentChannel&&currentChannel.name===ch.name&&currentChannel.url===ch.url;
+    const cls=playing?'card playing':'card';
+    const qlClass=(!ch.quality||parseInt(ch.quality)<720)?'sd':'';
+    const idx=ALL.indexOf(ch);
+    const sd=statusDot(ch);
+    const logoHtml=ch.logo?`<img src="${esc(ch.logo)}" loading="lazy" onerror="this.style.display='none'" style="width:48px;height:48px;border-radius:8px;object-fit:contain;background:var(--surface2);flex-shrink:0" alt="">`:`<div class="thumb">${flag||'📺'}</div>`;
     html+=`<div class="${cls}" onclick="play(${idx})" tabindex="0" onkeydown="if(event.key==='Enter')play(${idx})">
       ${logoHtml}
       <div class="detail">
@@ -2114,6 +2184,7 @@ async function refreshData(){
     $('updateTime').textContent=tn('justNow');
     if(currentView==='country')renderCountry(currentCountry);
     else if(currentView==='category')renderCategory(currentCountry,currentCategory);
+    else if(currentView==='source')renderSource(currentSource);
     else goHome();
     var msgs=[ALL.length.toLocaleString()+' channels'];
     if(newFromFT)msgs.push('+'+newFromFT+' Free-TV');
