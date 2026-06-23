@@ -1,6 +1,6 @@
-// 📺 IPTV Player — Service Worker v18
-// v18: v2.8.8 inferred EPG IDs
-const CACHE = 'iptv-player-v18';
+// 📺 IPTV Player — Service Worker v19
+// v19: v2.8.9 suppress broken logos
+const CACHE = 'iptv-player-v19';
 const ASSETS = [
   '/iptv-player/',
   '/iptv-player/manifest.json',
