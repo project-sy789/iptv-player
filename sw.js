@@ -1,6 +1,6 @@
-// 📺 IPTV Player — Service Worker v17
-// v17: v2.8.7 Romaxa source
-const CACHE = 'iptv-player-v17';
+// 📺 IPTV Player — Service Worker v18
+// v18: v2.8.8 inferred EPG IDs
+const CACHE = 'iptv-player-v18';
 const ASSETS = [
   '/iptv-player/',
   '/iptv-player/manifest.json',

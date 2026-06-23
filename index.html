@@ -634,7 +634,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     </form>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
-    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.8.7</div>
+    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.8.8</div>
   </div>
 </div>
 
@@ -782,6 +782,9 @@ const FREE_TV_TS = 'iptv_freetv_ts_v1';
 const STREAMS_API = 'https://iptv-org.github.io/api/streams.json';
 const STREAMS_CACHE = 'iptv_streams_v1';
 const STREAMS_TS = 'iptv_streams_ts_v1';
+const CHANNELS_API = 'https://iptv-org.github.io/api/channels.json';
+const CHANNELS_CACHE = 'iptv_channels_dir_v1';
+const CHANNELS_TS = 'iptv_channels_dir_ts_v1';
 const GUVI_M3U_URL = '';
 const GUVI_CACHE = 'iptv_guovi_v1';
 const GUVI_TS = 'iptv_guovi_ts_v1';
@@ -792,8 +795,9 @@ const AKKRADET_URL = 'https://raw.githubusercontent.com/akkradet/IPTV-THAI/maste
 const AKKRADET_CACHE = 'iptv_akkradet_v1';
 const AKKRADET_TS = 'iptv_akkradet_ts_v1';
 const ROMAXA_BASE = 'https://raw.githubusercontent.com/Romaxa55/world_ip_tv/master/output/';
-// Romaxa has 500+ country/subdivision playlists. Load a curated global set to avoid hammering iPad/Safari.
+// Romaxa has 500+ country/subdivision playlists. We load country-level files dynamically in batches.
 const ROMAXA_FILES = ['th','us','jp','kr','cn','in','id','my','sg','ph','vn','la','kh','mm','bd','au','de','fr','es','it','br','ca'];
+const ROMAXA_INDEX_API = 'https://api.github.com/repos/Romaxa55/world_ip_tv/contents/output?ref=master';
 const ROMAXA_CACHE = 'iptv_romaxa_v1';
 const ROMAXA_TS = 'iptv_romaxa_ts_v1';
 const CACHE_TTL = 6 * 3600 * 1000;
@@ -1150,23 +1154,107 @@ function extractInfoStream(s){
   };
 }
 
+// Conservative tvg-id inference from iptv-org channel directory.
+var channelDirPromise=null;
+var channelDir=null;
+function normalizeChannelName(name){
+  return String(name||'')
+    .replace(/\([^)]*\)/g,' ')
+    .replace(/\[[^\]]*\]/g,' ')
+    .replace(/\b(uhd|fhd|hd|sd|4k|8k|1080p|720p|576p|540p|480p|360p)\b/ig,' ')
+    .replace(/\b(tv|channel|network)\b/ig,' ')
+    .toLowerCase()
+    .replace(/&/g,'and')
+    .replace(/[^a-z0-9ก-๙]+/g,'')
+    .trim();
+}
+async function loadChannelDirectory(){
+  if(channelDir)return channelDir;
+  if(channelDirPromise)return channelDirPromise;
+  channelDirPromise=(async()=>{
+    try{
+      let raw=null;
+      const c=localStorage.getItem(CHANNELS_CACHE),t=localStorage.getItem(CHANNELS_TS);
+      if(c&&t&&Date.now()-parseInt(t)<CACHE_TTL)raw=c;
+      if(!raw){
+        const r=await fetch(CHANNELS_API,{cache:'no-cache',signal:AbortSignal.timeout(20000)});
+        if(!r.ok)throw new Error('HTTP '+r.status);
+        raw=await r.text();
+        try{localStorage.setItem(CHANNELS_CACHE,raw);localStorage.setItem(CHANNELS_TS,Date.now().toString());}catch(e){}
+      }
+      const arr=JSON.parse(raw);
+      const dir={};
+      arr.forEach(ch=>{
+        if(!ch||!ch.id||!ch.country)return;
+        const cc=String(ch.country).toUpperCase();
+        const names=[ch.name].concat(ch.alt_names||[]).map(normalizeChannelName).filter(Boolean);
+        names.forEach(n=>{
+          const key=cc+'|'+n;
+          if(!dir[key])dir[key]=[];
+          dir[key].push(ch.id);
+        });
+      });
+      channelDir=dir;
+      return dir;
+    }catch(e){channelDir={};return channelDir;}
+  })();
+  return channelDirPromise;
+}
+async function inferTvgIds(channels){
+  const dir=await loadChannelDirectory();
+  let inferred=0;
+  channels.forEach(ch=>{
+    if(!ch||ch.tvgId||!ch.country||!ch.name)return;
+    const key=String(ch.country).toUpperCase()+'|'+normalizeChannelName(ch.name);
+    const matches=dir[key]||[];
+    const uniq=Array.from(new Set(matches));
+    if(uniq.length===1){
+      ch.tvgId=uniq[0];
+      ch.inferredTvgId=true;
+      inferred++;
+    }
+  });
+  return inferred;
+}
+async function loadRomaxaFileList(){
+  try{
+    const r=await fetch(ROMAXA_INDEX_API,{cache:'no-cache',signal:AbortSignal.timeout(20000)});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const data=await r.json();
+    const files=data.map(x=>x.name).filter(n=>/^[a-z]{2}\.m3u$/i.test(n)).map(n=>n.replace(/\.m3u$/,''));
+    return files.length?files:ROMAXA_FILES;
+  }catch(e){return ROMAXA_FILES;}
+}
+async function mapWithConcurrency(items,limit,fn){
+  const out=[];let idx=0;
+  async function worker(){
+    while(idx<items.length){
+      const i=idx++;
+      out[i]=await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({length:Math.min(limit,items.length)},worker));
+  return out;
+}
+
 // Load curated Romaxa country playlists as one merged source.
 async function loadRomaxaRaw(){
   try{
     const c=localStorage.getItem(ROMAXA_CACHE),t=localStorage.getItem(ROMAXA_TS);
     if(c&&t&&Date.now()-parseInt(t)<CACHE_TTL)return JSON.parse(c);
   }catch(e){}
-  const parts=[];
-  await Promise.all(ROMAXA_FILES.map(async cc=>{
+  const files=await loadRomaxaFileList();
+  const loaded=await mapWithConcurrency(files,8,async cc=>{
     try{
       const r=await fetch(ROMAXA_BASE+cc+'.m3u',{cache:'no-cache'});
-      if(r.ok){parts.push({cc,raw:await r.text()});}
+      if(r.ok)return {cc,raw:await r.text()};
     }catch(e){}
-  }));
+    return null;
+  });
+  const parts=loaded.filter(Boolean);
   try{localStorage.setItem(ROMAXA_CACHE,JSON.stringify(parts));localStorage.setItem(ROMAXA_TS,Date.now().toString());}catch(e){}
   return parts;
 }
-
 // ====== DATA LOADING ======
 async function loadData(){
   if(_dataLoaded)return;
@@ -1236,6 +1324,7 @@ async function loadData(){
       const ch5=raw5?parseM3U(raw5).map(extractInfo):[];
       const ch6=raw6?parseM3U(raw6).map(e=>extractInfoFreeTV(e,'akkradet')):[];
       const ch7=Array.isArray(raw7)?raw7.flatMap(part=>parseM3U(part.raw).map(e=>extractInfoRomaxa(e,part.cc))):[];
+      const inferredTvg=await inferTvgIds(ch7);
       const seen=new Map();
       for(const ch of ch1){if(ch.url)seen.set(ch.url,ch);}
       let newFromFT=0, upgraded=0, newFromAPI=0, newFromGuovin=0, newFromBDIX=0, newFromAkkradet=0, newFromRomaxa=0;
@@ -1257,6 +1346,7 @@ async function loadData(){
       if(newFromBDIX)msgs.push('+'+newFromBDIX+' BDIX');
       if(newFromAkkradet)msgs.push('+'+newFromAkkradet+' akkradet');
       if(newFromRomaxa)msgs.push('+'+newFromRomaxa+' Romaxa');
+      if(inferredTvg)msgs.push('📅 '+inferredTvg+' EPG IDs');
       if(upgraded)msgs.push('✨ '+upgraded+' upgraded');
       const srcMsg=Object.entries(sourceCounts).map(([k,v])=>k+':'+v).join(' | ');
       if(srcMsg)msgs.push('🧩 '+srcMsg);
@@ -2263,6 +2353,7 @@ async function refreshData(){
     const ch5=raw5?parseM3U(raw5).map(extractInfo):[];
     const ch6=raw6?parseM3U(raw6).map(e=>extractInfoFreeTV(e,'akkradet')):[];
     const ch7=Array.isArray(raw7)?raw7.flatMap(part=>parseM3U(part.raw).map(e=>extractInfoRomaxa(e,part.cc))):[];
+    const inferredTvg=await inferTvgIds(ch7);
     const seen=new Map();
     for(const ch of ch1){if(ch.url)seen.set(ch.url,ch);}
     let newFromFT=0, newFromAPI=0, newFromGuovin=0, newFromBDIX=0, newFromAkkradet=0, newFromRomaxa=0, upgraded=0;
@@ -2303,6 +2394,7 @@ async function refreshData(){
     if(newFromBDIX)msgs.push('+'+newFromBDIX+' BDIX');
     if(newFromAkkradet)msgs.push('+'+newFromAkkradet+' akkradet');
     if(newFromRomaxa)msgs.push('+'+newFromRomaxa+' Romaxa');
+    if(inferredTvg)msgs.push('📅 '+inferredTvg+' EPG IDs');
     if(upgraded)msgs.push('✨ '+upgraded+' upgraded');
     toast('✅ '+msgs.join(', '));
   }catch(e){
@@ -2608,6 +2700,7 @@ var epgSourcePromises = {}; // { sourceKey: Promise }
 const EPG_KEY = 'iptv_epg_v3';
 const EPG_TTL = 3 * 3600 * 1000;
 const AKKRADET_EPG_URL = 'https://akkradet.github.io/IPTV-THAI/guide.xml';
+function epgShareCountryUrl(cc){return cc?'https://epgshare01.online/epgshare01/epg_ripper_'+String(cc).toUpperCase()+'1.xml.gz':'';}
 
 function normalizeEpgId(id){
   return String(id||'').replace(/@[^.\s]+$/,'').replace(/\.(th|bd|us|uk|au|ca|de|fr|jp|kr|cn|in|id|my|sg|vn|ph|la|kh|mm)$/i,'').toLowerCase().replace(/[^a-z0-9ก-๙]+/g,'');
@@ -2618,6 +2711,7 @@ function epgUrlsForChannel(ch){
   const urls=[];
   (ch&&ch.epgUrls||[]).forEach(u=>urls.push(u));
   if(ch&&((ch._src==='akkradet')||/\.th(@|$)/i.test(ch.tvgId||'')||ch.country==='TH'))urls.push(AKKRADET_EPG_URL);
+  if(ch&&ch.inferredTvgId&&ch.country)urls.push(epgShareCountryUrl(ch.country));
   return Array.from(new Set(urls)).filter(u=>{
     const x=u.toLowerCase();
     if(x.includes('all_sources'))return false;
