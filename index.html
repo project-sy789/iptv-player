@@ -421,16 +421,28 @@ body{
   overflow:hidden;
 }
 #player-overlay .topbar{
-  padding:10px 20px;display:flex;align-items:center;gap:12px;
+  padding:10px 20px;display:flex;align-items:center;gap:10px;
   background:#0a0a0a;border-bottom:1px solid #222;
-  flex-shrink:0;min-width:0;
+  flex-shrink:0;min-width:0;width:100%;
+  flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none;
 }
-#player-overlay .topbar .tname{font-weight:600;font-size:14px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#player-overlay .topbar::-webkit-scrollbar{display:none}
+#player-overlay .topbar .tname{font-weight:600;font-size:14px;flex:1 1 auto;min-width:48px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#player-overlay .topbar button,
+#player-overlay .topbar select{
+  flex:0 0 auto;white-space:nowrap;
+}
 #player-overlay .topbar button{
   background:#222;color:#fff;border:none;
-  padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;
-  flex-shrink:0;
+  padding:8px 14px;border-radius:6px;cursor:pointer;font-size:13px;
 }
+#overlayCloseBtn,#overlayStopBtn{
+  position:sticky;z-index:2;
+  box-shadow:-10px 0 12px rgba(0,0,0,.45);
+}
+#overlayCloseBtn{right:76px}
+#overlayStopBtn{right:0}
 #player-overlay video{flex:1;width:100%;height:100%;min-height:0;max-height:none;background:#000;object-fit:contain}
 #player-overlay.on{display:flex}
 #player-overlay .topbar button:hover{background:#444}
@@ -573,9 +585,11 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
   .login-box{padding:28px 20px}
   .login-box .icon{font-size:44px}
   .login-box h2{font-size:20px}
-  #player-overlay .topbar{padding:8px 12px}
-  #player-overlay .topbar .tname{font-size:12px}
-  #player-overlay .topbar button{font-size:11px;padding:6px 10px}
+  #player-overlay .topbar{padding:8px max(8px,env(safe-area-inset-right)) 8px max(8px,env(safe-area-inset-left));gap:6px}
+  #player-overlay .topbar .tname{font-size:12px;flex:0 1 22vw;max-width:22vw;min-width:42px}
+  #player-overlay .topbar button{font-size:11px;padding:6px 9px}
+  #player-overlay .topbar select{font-size:10px!important;max-width:62px!important;padding:5px 6px!important}
+  #overlayNativeBtn,#overlayCloseBtn,#overlayStopBtn{min-width:38px;text-align:center}
   #sidebar nav button{font-size:12px;padding:8px 10px}
   #sidebar .logo{font-size:17px;padding:14px 14px 10px}
 }
@@ -620,7 +634,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     </form>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
-    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.8.4</div>
+    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.8.5</div>
   </div>
 </div>
 
@@ -994,9 +1008,25 @@ function refreshLangUI(){
   setText('overlayCcBtn',tn('subtitleBtn'));
   setTitle('overlayCcBtn',tn('ccTitle'));
   renderLangToggle();
+  syncResponsiveControlLabels();
 }
 function setText(id,text){const e=document.getElementById(id);if(e&&text)e.textContent=text;}
 function setTitle(id,text){const e=document.getElementById(id);if(e&&text)e.title=text;}
+
+function syncResponsiveControlLabels(){
+  const compact = window.matchMedia && window.matchMedia('(max-width: 480px)').matches;
+  const nativeLabel = compact ? '⛶' : tn('nativeMode');
+  const closeLabel = compact ? '⬇' : tn('closeFull');
+  const stopLabel = compact ? '✕' : tn('stopFull');
+  setText('overlayNativeBtn', nativeLabel);
+  setTitle('overlayNativeBtn', tn('nativeMode'));
+  setText('overlayCloseBtn', closeLabel);
+  setTitle('overlayCloseBtn', tn('closeFull'));
+  setText('overlayStopBtn', stopLabel);
+  setTitle('overlayStopBtn', tn('stopFull'));
+}
+window.addEventListener('resize', syncResponsiveControlLabels);
+window.addEventListener('orientationchange', syncResponsiveControlLabels);
 
 // ====== M3U PARSER ======
 function parseM3U(text){

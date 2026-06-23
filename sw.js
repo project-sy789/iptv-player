@@ -1,6 +1,6 @@
-// 📺 IPTV Player — Service Worker v14
-// v14: v2.8.4 iPhone topbar overlap fix
-const CACHE = 'iptv-player-v14';
+// 📺 IPTV Player — Service Worker v15
+// v15: v2.8.5 theater controls fit fix
+const CACHE = 'iptv-player-v15';
 const ASSETS = [
   '/iptv-player/',
   '/iptv-player/manifest.json',
