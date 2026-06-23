@@ -169,12 +169,12 @@ body{
 #topbar::-webkit-scrollbar{display:none}
 #topbar .title{font-size:18px;font-weight:700}
 #topbar .sub{font-size:13px;color:var(--dim);margin-left:4px}
-#topbar .breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--dim)}
-#topbar .breadcrumb span{cursor:pointer;transition:color .15s}
+#topbar .breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--dim);min-width:0;max-width:48vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto}
+#topbar .breadcrumb span{cursor:pointer;transition:color .15s;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #topbar .breadcrumb span:hover{color:var(--accent)}
 #topbar .breadcrumb .sep{color:var(--border);cursor:default}
-#topbar .spacer{flex:1}
-#topbar .stats{font-size:12px;color:var(--dim);display:flex;align-items:center;gap:6px}
+#topbar .spacer{flex:1;min-width:8px}
+#topbar .stats{font-size:12px;color:var(--dim);display:flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0}
 #topbar .stats .dot{width:7px;height:7px;border-radius:50%;background:var(--live)}
 
 /* === CONTENT === */
@@ -536,14 +536,19 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
   #player-bar .info .nm{font-size:12px}
   #player-bar .info .sub{font-size:10px}
   #player-bar button{padding:5px 10px;font-size:11px;flex-shrink:0}
-  #topbar{padding:8px 10px 8px 50px;gap:6px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;min-width:0}
+  #topbar{padding:8px 8px 8px 48px;gap:6px;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;min-width:0;width:100%;align-items:center}
   #topbar::-webkit-scrollbar{display:none}
-  #topbar .breadcrumb{font-size:12px;min-width:0;white-space:nowrap}
-  #topbar .stats{font-size:11px;flex-shrink:0}
+  #topbar .breadcrumb{font-size:12px;min-width:64px;max-width:36vw;flex:0 1 36vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #topbar .breadcrumb span:not(:last-child){display:none}
+  #topbar .breadcrumb .sep{display:none!important}
+  #topbar .breadcrumb span:last-child{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #topbar .spacer{display:none}
+  #topbar .stats{font-size:10px;flex:0 0 auto;max-width:56px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #updateTime{display:none!important}
   #topbar select{font-size:11px;padding:5px 8px;flex-shrink:0}
   #topbar button{font-size:10px!important;padding:4px 8px!important;white-space:nowrap;flex-shrink:0}
   #logout-btn{font-size:10px!important;padding:4px 8px!important;white-space:nowrap;flex-shrink:0}
-  #langToggle{font-size:10px!important;flex-shrink:0}
+  #langToggle{font-size:10px!important;flex-shrink:0;white-space:nowrap}
   #themeToggle{font-size:12px!important;flex-shrink:0}
   #search input{font-size:12px;padding:8px 10px}
   .country-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
@@ -573,6 +578,17 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
   #player-overlay .topbar button{font-size:11px;padding:6px 10px}
   #sidebar nav button{font-size:12px;padding:8px 10px}
   #sidebar .logo{font-size:17px;padding:14px 14px 10px}
+}
+@media(max-width:430px){
+  #topbar{padding-left:44px;gap:5px}
+  #topbar .breadcrumb{max-width:30vw;flex-basis:30vw;min-width:52px;font-size:11px}
+  #topbar .stats{max-width:44px;font-size:9px}
+  #refreshBtn,#testBtn,#logout-btn{max-width:42px;overflow:hidden;text-overflow:clip}
+  #langToggle{font-size:9px!important}
+}
+@media(max-width:360px){
+  #topbar .stats{display:none}
+  #topbar .breadcrumb{max-width:34vw;flex-basis:34vw}
 }
 @media(min-width:1600px) and (min-height:900px){
   :root{--sidebar-w:280px}
@@ -604,7 +620,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     </form>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
-    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.8.3</div>
+    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.8.4</div>
   </div>
 </div>
 
