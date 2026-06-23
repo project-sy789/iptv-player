@@ -1,9 +1,10 @@
-// 📺 IPTV Player — Service Worker v19
-// v19: v2.8.9 suppress broken logos
-const CACHE = 'iptv-player-v19';
+// 📺 IPTV Player — Service Worker v20
+// v20: v2.8.10 local HLS + legacy icon fallback
+const CACHE = 'iptv-player-v20';
 const ASSETS = [
   '/iptv-player/',
   '/iptv-player/manifest.json',
+  '/iptv-player/vendor/hls.min.js',
   '/iptv-player/icons/icon-192.png',
   '/iptv-player/icons/icon-512.png',
   '/iptv-player/icons/icon-maskable.png',
@@ -32,6 +33,12 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   const isLocal = url.origin === self.location.origin;
+
+  // Legacy PWA/Safari icon probes sometimes request bare "512" from old manifests/caches.
+  if (isLocal && (url.pathname === '/512' || url.pathname === '/iptv-player/512')) {
+    e.respondWith(caches.match('/iptv-player/icons/icon-512.png').then(cached => cached || fetch('/iptv-player/icons/icon-512.png')));
+    return;
+  }
 
   // HTML: always go to network (no cache)
   if (isLocal && (url.pathname.endsWith('.html') || url.pathname === '/' || url.pathname.endsWith('/iptv-player/') || url.pathname === '/iptv-player/')) {

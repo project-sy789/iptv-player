@@ -13,9 +13,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png">
 <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
-<link rel="preconnect" href="https://cdn.jsdelivr.net">
 <link rel="preconnect" href="https://iptv-org.github.io">
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script src="vendor/hls.min.js"></script>
 <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
 <style>
 :root {
@@ -634,7 +633,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     </form>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
-    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.8.9</div>
+    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.8.10</div>
   </div>
 </div>
 
@@ -794,6 +793,9 @@ const BDIX_TS = 'iptv_bdix_ts_v1';
 const AKKRADET_URL = 'https://raw.githubusercontent.com/akkradet/IPTV-THAI/master/FREETV.m3u';
 const AKKRADET_CACHE = 'iptv_akkradet_v1';
 const AKKRADET_TS = 'iptv_akkradet_ts_v1';
+const KEWSITO_URL = 'https://raw.githubusercontent.com/Kewsito/lista-deportes-argentina/refs/heads/main/lista.m3u8';
+const KEWSITO_CACHE = 'iptv_kewsito_sports_ar_v1';
+const KEWSITO_TS = 'iptv_kewsito_sports_ar_ts_v1';
 const ROMAXA_BASE = 'https://raw.githubusercontent.com/Romaxa55/world_ip_tv/master/output/';
 // Romaxa has 500+ country/subdivision playlists. We load country-level files dynamically in batches.
 const ROMAXA_FILES = ['th','us','jp','kr','cn','in','id','my','sg','ph','vn','la','kh','mm','bd','au','de','fr','es','it','br','ca'];
@@ -1128,6 +1130,29 @@ function extractInfoFreeTV(e,src){
   };
 }
 
+// Kewsito/lista-deportes-argentina parser — sports playlist for Argentina
+function extractInfoKewsito(e){
+  const x=e.extinf;
+  const nm=x.match(/,([^,\[\n]+?)(?:\s*\[.*?\])?\s*$/);
+  const qm=x.match(/\((\d+p)\)/);
+  const gm=x.match(/group-title="([^"]+)"/);
+  const tm=x.match(/tvg-id="([^"]+)"/);
+  const lm=x.match(/tvg-logo="([^"]+)"/);
+  return{
+    name:nm?nm[1].trim():'Unknown',
+    quality:qm?qm[1]:null,
+    cat:gm?gm[1]:'Deportes',
+    country:'AR',
+    logo:cleanLogoUrl(lm?lm[1]:null),
+    geo:false,
+    not247:/\[Not 24\/7\]/i.test(x),
+    tvgId:tm?tm[1]:null,
+    epgUrls:e.epgUrls||[],
+    url:e.url,
+    _src:'kewsito-sports-ar'
+  };
+}
+
 // Romaxa55/world_ip_tv parser — country comes from output/{cc}.m3u file name
 function extractInfoRomaxa(e,cc){
   const x=e.extinf;
@@ -1304,7 +1329,7 @@ async function loadData(){
   // Load optional sources in the background, then merge and rerender
   setTimeout(async ()=>{
     try{
-      let raw2=null, raw3=null, raw4=null, raw5=null, raw6=null, raw7=null;
+      let raw2=null, raw3=null, raw4=null, raw5=null, raw6=null, raw7=null, raw8=null;
       try{
         const c2=localStorage.getItem(FREE_TV_CACHE),t2=localStorage.getItem(FREE_TV_TS);
         if(c2&&t2&&Date.now()-parseInt(t2)<CACHE_TTL){raw2=c2;}
@@ -1330,6 +1355,11 @@ async function loadData(){
         if(c6&&t6&&Date.now()-parseInt(t6)<CACHE_TTL){raw6=c6;}
       }catch(e){}
       if(!raw6){try{const r6=await fetch(AKKRADET_URL,{cache:'no-cache'});if(r6.ok){raw6=await r6.text();localStorage.setItem(AKKRADET_CACHE,raw6);localStorage.setItem(AKKRADET_TS,Date.now().toString())}}catch(e){}}
+      try{
+        const c8=localStorage.getItem(KEWSITO_CACHE),t8=localStorage.getItem(KEWSITO_TS);
+        if(c8&&t8&&Date.now()-parseInt(t8)<CACHE_TTL){raw8=c8;}
+      }catch(e){}
+      if(!raw8){try{const r8=await fetch(KEWSITO_URL,{cache:'no-cache'});if(r8.ok){raw8=await r8.text();localStorage.setItem(KEWSITO_CACHE,raw8);localStorage.setItem(KEWSITO_TS,Date.now().toString())}}catch(e){}}
       raw7=await loadRomaxaRaw();
 
       const ch2=raw2?parseM3U(raw2).map(e=>extractInfoFreeTV(e,'free-tv')):[];
@@ -1338,16 +1368,18 @@ async function loadData(){
       const ch5=raw5?parseM3U(raw5).map(extractInfo):[];
       const ch6=raw6?parseM3U(raw6).map(e=>extractInfoFreeTV(e,'akkradet')):[];
       const ch7=Array.isArray(raw7)?raw7.flatMap(part=>parseM3U(part.raw).map(e=>extractInfoRomaxa(e,part.cc))):[];
+      const ch8=raw8?parseM3U(raw8).map(extractInfoKewsito):[];
       const inferredTvg=await inferTvgIds(ch7);
       const seen=new Map();
       for(const ch of ch1){if(ch.url)seen.set(ch.url,ch);}
-      let newFromFT=0, upgraded=0, newFromAPI=0, newFromGuovin=0, newFromBDIX=0, newFromAkkradet=0, newFromRomaxa=0;
+      let newFromFT=0, upgraded=0, newFromAPI=0, newFromGuovin=0, newFromBDIX=0, newFromAkkradet=0, newFromRomaxa=0, newFromKewsito=0;
       for(const ch of ch2){if(!ch.url)continue;const existing=seen.get(ch.url);if(existing){let better=false;if(ch.logo&&!existing.logo){existing.logo=ch.logo;better=true;}if(ch.tvgId&&!existing.tvgId){existing.tvgId=ch.tvgId;better=true;}if(ch.country&&!existing.country){existing.country=ch.country;better=true;}if(better)upgraded++;}else{seen.set(ch.url,ch);newFromFT++;}}
       for(const ch of ch3){if(!ch.url)continue;const existing=seen.get(ch.url);if(existing){if(ch.quality&&!existing.quality){existing.quality=ch.quality;}if(ch.tvgId&&!existing.tvgId){existing.tvgId=ch.tvgId;}}else{seen.set(ch.url,ch);newFromAPI++;}}
       for(const ch of ch4){if(!ch.url)continue;const existing=seen.get(ch.url);if(existing){let better=false;if(ch.logo&&!existing.logo){existing.logo=ch.logo;better=true;}if(ch.tvgId&&!existing.tvgId){existing.tvgId=ch.tvgId;better=true;}if(ch.country&&!existing.country){existing.country=ch.country;better=true;}if(ch.quality&&!existing.quality){existing.quality=ch.quality;better=true;}if(better)upgraded++;}else{seen.set(ch.url,ch);newFromGuovin++;}}
       for(const ch of ch5){if(!ch.url)continue;const existing=seen.get(ch.url);if(existing){let better=false;if(ch.logo&&!existing.logo){existing.logo=ch.logo;better=true;}if(ch.tvgId&&!existing.tvgId){existing.tvgId=ch.tvgId;better=true;}if(ch.country&&!existing.country){existing.country=ch.country;better=true;}if(ch.quality&&!existing.quality){existing.quality=ch.quality;better=true;}if(better)upgraded++;}else{seen.set(ch.url,ch);newFromBDIX++;}}
       for(const ch of ch6){if(!ch.url)continue;const existing=seen.get(ch.url);if(existing){let better=false;if(ch.logo&&!existing.logo){existing.logo=ch.logo;better=true;}if(ch.tvgId&&!existing.tvgId){existing.tvgId=ch.tvgId;better=true;}if(ch.country&&!existing.country){existing.country=ch.country;better=true;}if(ch.quality&&!existing.quality){existing.quality=ch.quality;better=true;}if(better)upgraded++;}else{seen.set(ch.url,ch);newFromAkkradet++;}}
       for(const ch of ch7){if(!ch.url)continue;const existing=seen.get(ch.url);if(existing){let better=false;if(ch.logo&&!existing.logo){existing.logo=ch.logo;better=true;}if(ch.tvgId&&!existing.tvgId){existing.tvgId=ch.tvgId;better=true;}if(ch.country&&!existing.country){existing.country=ch.country;better=true;}if(ch.quality&&!existing.quality){existing.quality=ch.quality;better=true;}if(better)upgraded++;}else{seen.set(ch.url,ch);newFromRomaxa++;}}
+      for(const ch of ch8){if(!ch.url)continue;const existing=seen.get(ch.url);if(existing){let better=false;if(ch.logo&&!existing.logo){existing.logo=ch.logo;better=true;}if(ch.tvgId&&!existing.tvgId){existing.tvgId=ch.tvgId;better=true;}if(ch.quality&&!existing.quality){existing.quality=ch.quality;better=true;}if(better)upgraded++;}else{seen.set(ch.url,ch);newFromKewsito++;}}
       ALL=Array.from(seen.values());
       buildDB();
       goHome();
@@ -1360,6 +1392,7 @@ async function loadData(){
       if(newFromBDIX)msgs.push('+'+newFromBDIX+' BDIX');
       if(newFromAkkradet)msgs.push('+'+newFromAkkradet+' akkradet');
       if(newFromRomaxa)msgs.push('+'+newFromRomaxa+' Romaxa');
+      if(newFromKewsito)msgs.push('+'+newFromKewsito+' Deportes AR');
       if(inferredTvg)msgs.push('📅 '+inferredTvg+' EPG IDs');
       if(upgraded)msgs.push('✨ '+upgraded+' upgraded');
       const srcMsg=Object.entries(sourceCounts).map(([k,v])=>k+':'+v).join(' | ');
@@ -2347,7 +2380,7 @@ function closeSidebar(){
 // ====== REFRESH ======
 async function refreshData(){
   $('chCount').textContent='Refreshing...';
-  toast('🔄 Fetching latest from 7 sources...');
+  toast('🔄 Fetching latest from 8 sources...');
   try{
     const r1=await fetch(M3U_URL,{cache:'no-cache'});
     if(!r1.ok)throw new Error('HTTP '+r1.status);
@@ -2355,12 +2388,13 @@ async function refreshData(){
     localStorage.setItem(CACHE_KEY,raw1);
     localStorage.setItem(CACHE_TS,Date.now().toString());
 
-    let raw2=null, raw3=null, raw4=null, raw5=null, raw6=null, raw7=null;
+    let raw2=null, raw3=null, raw4=null, raw5=null, raw6=null, raw7=null, raw8=null;
     try{const r2=await fetch(FREE_TV_URL,{cache:'no-cache'});if(r2.ok){raw2=await r2.text();localStorage.setItem(FREE_TV_CACHE,raw2);localStorage.setItem(FREE_TV_TS,Date.now().toString());}}catch(e){}
     try{const r3=await fetch(STREAMS_API,{cache:'no-cache'});if(r3.ok){raw3=await r3.text();localStorage.setItem(STREAMS_CACHE,raw3);localStorage.setItem(STREAMS_TS,Date.now().toString());}}catch(e){}
     try{if(GUVI_M3U_URL){const r4=await fetch(GUVI_M3U_URL,{cache:'no-cache'});if(r4.ok){raw4=await r4.text();localStorage.setItem(GUVI_CACHE,raw4);localStorage.setItem(GUVI_TS,Date.now().toString());}}}catch(e){}
     try{const r5=await fetch(BDIX_M3U_URL,{cache:'no-cache'});if(r5.ok){raw5=await r5.text();localStorage.setItem(BDIX_CACHE,raw5);localStorage.setItem(BDIX_TS,Date.now().toString());}}catch(e){}
     try{const r6=await fetch(AKKRADET_URL,{cache:'no-cache'});if(r6.ok){raw6=await r6.text();localStorage.setItem(AKKRADET_CACHE,raw6);localStorage.setItem(AKKRADET_TS,Date.now().toString());}}catch(e){}
+    try{const r8=await fetch(KEWSITO_URL,{cache:'no-cache'});if(r8.ok){raw8=await r8.text();localStorage.setItem(KEWSITO_CACHE,raw8);localStorage.setItem(KEWSITO_TS,Date.now().toString());}}catch(e){}
     try{localStorage.removeItem(ROMAXA_CACHE);localStorage.removeItem(ROMAXA_TS);raw7=await loadRomaxaRaw();}catch(e){}
 
     const ch1=parseM3U(raw1).map(extractInfo);
@@ -2370,10 +2404,11 @@ async function refreshData(){
     const ch5=raw5?parseM3U(raw5).map(extractInfo):[];
     const ch6=raw6?parseM3U(raw6).map(e=>extractInfoFreeTV(e,'akkradet')):[];
     const ch7=Array.isArray(raw7)?raw7.flatMap(part=>parseM3U(part.raw).map(e=>extractInfoRomaxa(e,part.cc))):[];
+    const ch8=raw8?parseM3U(raw8).map(extractInfoKewsito):[];
     const inferredTvg=await inferTvgIds(ch7);
     const seen=new Map();
     for(const ch of ch1){if(ch.url)seen.set(ch.url,ch);}
-    let newFromFT=0, newFromAPI=0, newFromGuovin=0, newFromBDIX=0, newFromAkkradet=0, newFromRomaxa=0, upgraded=0;
+    let newFromFT=0, newFromAPI=0, newFromGuovin=0, newFromBDIX=0, newFromAkkradet=0, newFromRomaxa=0, newFromKewsito=0, upgraded=0;
     const mergeRich=(ch,label)=>{
       if(!ch.url)return false;
       const ex=seen.get(ch.url);
@@ -2396,6 +2431,7 @@ async function refreshData(){
     for(const ch of ch5){if(mergeRich(ch,'BDIX'))newFromBDIX++;}
     for(const ch of ch6){if(mergeRich(ch,'akkradet'))newFromAkkradet++;}
     for(const ch of ch7){if(mergeRich(ch,'Romaxa'))newFromRomaxa++;}
+    for(const ch of ch8){if(mergeRich(ch,'Kewsito Sports AR'))newFromKewsito++;}
     ALL=Array.from(seen.values());
     buildDB();
     $('lastUpdate').textContent=tn('updated');
@@ -2411,6 +2447,7 @@ async function refreshData(){
     if(newFromBDIX)msgs.push('+'+newFromBDIX+' BDIX');
     if(newFromAkkradet)msgs.push('+'+newFromAkkradet+' akkradet');
     if(newFromRomaxa)msgs.push('+'+newFromRomaxa+' Romaxa');
+    if(newFromKewsito)msgs.push('+'+newFromKewsito+' Deportes AR');
     if(inferredTvg)msgs.push('📅 '+inferredTvg+' EPG IDs');
     if(upgraded)msgs.push('✨ '+upgraded+' upgraded');
     toast('✅ '+msgs.join(', '));
