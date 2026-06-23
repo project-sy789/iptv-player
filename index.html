@@ -634,7 +634,7 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-family:-apple-system,sans-
     </form>
     <div class="error" id="loginError"></div>
     <div class="hint" id="loginHint">🔒 ป้องกัน · iptv-org</div>
-    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.8.5</div>
+    <div class="hint" style="margin-top:4px;font-size:10px;opacity:.5">v2.8.6</div>
   </div>
 </div>
 
@@ -1029,22 +1029,31 @@ window.addEventListener('resize', syncResponsiveControlLabels);
 window.addEventListener('orientationchange', syncResponsiveControlLabels);
 
 // ====== M3U PARSER ======
+function extractEpgUrls(header){
+  const urls=[];
+  const h=String(header||'');
+  const re=/(?:x-tvg-url|url-tvg|tvg-url)="([^"]+)"/ig;
+  let m;
+  while((m=re.exec(h))!==null){
+    m[1].split(',').map(x=>x.trim()).filter(Boolean).forEach(u=>urls.push(u));
+  }
+  return Array.from(new Set(urls));
+}
 function parseM3U(text){
   const lines=text.split('\n'),entries=[];
+  const headerEpgUrls=extractEpgUrls(lines.find(l=>l.trim().startsWith('#EXTM3U'))||'');
   let i=0;
   while(i<lines.length){
     if(lines[i].trim().startsWith('#EXTINF:')){
       const extinf=lines[i].trim();i++;
       let url='';
-      // Skip blank lines and VLC/directive metadata between EXTINF and URL.
-      // Some sources (akkradet/IPTV-THAI) put #EXTVLCOPT:http-user-agent here.
       while(i<lines.length){
         const line=lines[i].trim();
         if(line.startsWith('#EXTINF:'))break;
         if(!line||line.startsWith('#')){i++;continue;}
         url=line;i++;break;
       }
-      entries.push({extinf,url});
+      entries.push({extinf,url,epgUrls:headerEpgUrls});
     }else{i++}
   }
   return entries;
@@ -1065,6 +1074,7 @@ function extractInfo(e){
     geo:/\[Geo-blocked\]/i.test(x),
     not247:/\[Not 24\/7\]/i.test(x),
     tvgId:tm?tm[1]:null,
+    epgUrls:e.epgUrls||[],
     url:e.url,
     _src:'iptv-org'
   };
@@ -1089,6 +1099,7 @@ function extractInfoFreeTV(e,src){
     geo:/\[Geo-blocked\]/i.test(x),
     not247:/\[Not 24\/7\]/i.test(x),
     tvgId:tm?tm[1]:null,
+    epgUrls:e.epgUrls||[],
     url:e.url,
     _src:src||'free-tv'
   };
@@ -1105,6 +1116,7 @@ function extractInfoStream(s){
     geo:s.label&&/geo-block/i.test(s.label),
     not247:s.label&&/not 24/i.test(s.label),
     tvgId:s.channel||null,
+    epgUrls:[],
     url:s.url||'',
     _src:'iptv-api'
   };
@@ -2537,113 +2549,84 @@ function testVisibleChannels(){
 }
 
 
-// ── EPG (Electronic Program Guide) — จาก iptv-org guide.xml.gz ──
-var epgData = {};       // { channelId: { programs: [{start,stop,title}], _ts } }
-var epgLoadPromise = null;
-const EPG_KEY = 'iptv_epg_v2';
-const EPG_URL = '';
-const EPG_TTL = 3 * 3600 * 1000; // 3h cache
+// ── EPG (Electronic Program Guide) — multi-source from playlist metadata ──
+var epgData = {};          // { sourceKey: { _ts, channels: { normalizedId: programs[] } } }
+var epgSourcePromises = {}; // { sourceKey: Promise }
+const EPG_KEY = 'iptv_epg_v3';
+const EPG_TTL = 3 * 3600 * 1000;
+const AKKRADET_EPG_URL = 'https://akkradet.github.io/IPTV-THAI/guide.xml';
 
-// Load EPG cache from localStorage
+function normalizeEpgId(id){
+  return String(id||'').replace(/@[^.\s]+$/,'').replace(/\.(th|bd|us|uk|au|ca|de|fr|jp|kr|cn|in|id|my|sg|vn|ph|la|kh|mm)$/i,'').toLowerCase().replace(/[^a-z0-9ก-๙]+/g,'');
+}
+function xmlDecode(s){return String(s||'').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'");}
+function epgSourceKey(url){return String(url||'').replace(/^https?:\/\//,'').replace(/[^a-z0-9]+/gi,'_').slice(0,80);}
+function epgUrlsForChannel(ch){
+  const urls=[];
+  (ch&&ch.epgUrls||[]).forEach(u=>urls.push(u));
+  if(ch&&((ch._src==='akkradet')||/\.th(@|$)/i.test(ch.tvgId||'')||ch.country==='TH'))urls.push(AKKRADET_EPG_URL);
+  return Array.from(new Set(urls)).filter(u=>{
+    const x=u.toLowerCase();
+    if(x.includes('all_sources'))return false;
+    if(x.includes('epgshare01')&&ch&&ch.country)return x.includes('_'+ch.country.toLowerCase()+'1')||x.includes('_'+ch.country.toUpperCase()+'1');
+    return true;
+  }).slice(0,3);
+}
 function loadEpgCache(){
-  try {
-    const raw = localStorage.getItem(EPG_KEY);
-    if (raw) {
-      const data = JSON.parse(raw);
-      if (Date.now() - (data._ts || 0) < EPG_TTL) {
-        epgData = data.channels || {};
-      }
-    }
-  } catch(e) { epgData = {}; }
+  try{const raw=localStorage.getItem(EPG_KEY);if(!raw)return;const data=JSON.parse(raw);if(Date.now()-(data._ts||0)<EPG_TTL)epgData=data.sources||{};}catch(e){epgData={};}
 }
-
-function saveEpgCache() {
-  try {
-    localStorage.setItem(EPG_KEY, JSON.stringify({ _ts: Date.now(), channels: epgData }));
-  } catch(e) {}
+function saveEpgCache(){try{localStorage.setItem(EPG_KEY,JSON.stringify({_ts:Date.now(),sources:epgData}));}catch(e){}}
+async function fetchTextMaybeGzip(url){
+  const r=await fetch(url,{cache:'no-cache',signal:AbortSignal.timeout(15000)});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  const isGz=/\.gz(\?|$)/i.test(url)||/gzip|octet-stream/i.test(r.headers.get('content-type')||'');
+  if(isGz&&window.DecompressionStream&&r.body){try{return await new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).text();}catch(e){}}
+  return await r.text();
 }
-
-// Fetch + parse the full guide.xml.gz once
-async function loadEpgGuide() {
-  if (epgLoadPromise) return epgLoadPromise;
-  epgLoadPromise = (async () => {
-    try {
-      const r = await fetch(EPG_URL, { signal: AbortSignal.timeout(15000) });
-      if (!r.ok) return;
-      // Decompress gzip via native DecompressionStream
-      let xml;
-      try {
-        const ds = new DecompressionStream('gzip');
-        const decompressed = r.body.pipeThrough(ds);
-        xml = await new Response(decompressed).text();
-      } catch(e) {
-        // Fallback: maybe server served uncompressed
-        xml = await r.text();
-      }
-      if (!xml || xml.length < 100) return;
-      
-      // Parse XML: extract channel→programs mapping
-      const channels = {};
-      // Match <programme ... channel="ID" ...> ... <title>TITLE</title> ... </programme>
-      const progRegex = /<programme[^>]*start="([^"]+)"[^>]*stop="([^"]+)"[^>]*channel="([^"]+)"[^>]*>[\s\S]*?<title[^>]*>([^<]+)<\/title>/gi;
-      let m;
-      while ((m = progRegex.exec(xml)) !== null) {
-        const chId = m[3];
-        if (!channels[chId]) channels[chId] = [];
-        if (channels[chId].length < 30) { // keep up to 30 programs per channel
-          channels[chId].push({ start: m[1], stop: m[2], title: m[4].trim() });
-        }
-      }
-      epgData = channels;
-      saveEpgCache();
-    } catch(e) { /* silent */ }
-  })();
-  return epgLoadPromise;
-}
-
-// Show EPG for current channel (called after channel is played)
-function showEpgForChannel(ch) {
-  if (!ch || !ch._tvgId) return;
-  const programs = epgData[ch._tvgId];
-  if (!programs || !programs.length) return;
-  
-  const now = new Date();
-  let nowTitle = '', nextTitle = '';
-  for (const p of programs) {
-    // Parse "20260621093000 +0000" → Date
-    const startStr = p.start.replace(' ', 'T').replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/, '$1-$2-$3T$4:$5:$6');
-    const stopStr = p.stop.replace(' ', 'T').replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/, '$1-$2-$3T$4:$5:$6');
-    const start = new Date(startStr), stop = new Date(stopStr);
-    if (now >= start && now < stop) { nowTitle = p.title; continue; }
-    if (start > now && !nextTitle) { nextTitle = p.title; break; }
+function parseXmltv(xml){
+  const channels={};
+  const progRegex=/<programme[^>]*start="([^"]+)"[^>]*stop="([^"]+)"[^>]*channel="([^"]+)"[^>]*>[\s\S]*?<title[^>]*>([^<]+)<\/title>/gi;
+  let m;
+  while((m=progRegex.exec(xml))!==null){
+    const ids=[m[3],normalizeEpgId(m[3])].filter(Boolean);
+    const prog={start:m[1],stop:m[2],title:xmlDecode(m[4]).trim()};
+    ids.forEach(id=>{if(!channels[id])channels[id]=[];if(channels[id].length<80)channels[id].push(prog);});
   }
-  
-  if (nowTitle) {
-    ch._epgNow = nowTitle;
-    if (nextTitle) ch._epgNext = nextTitle;
-    // Update player bar
-    if (currentChannel && currentChannel._tvgId === ch._tvgId) {
-      const el = $('barEpg');
-      if (el) {
-        el.style.display = 'block';
-        el.textContent = '📅 ' + nowTitle + (nextTitle ? ' · ▶ ' + nextTitle : '');
-      }
-    }
-  }
+  return channels;
 }
-
-// Called when channel is played
-function loadEpgForChannel(ch) {
-  if (!ch || !ch._tvgId) return;
-  if (epgData[ch._tvgId]) {
-    showEpgForChannel(ch);
-  } else if (!epgLoadPromise) {
-    loadEpgGuide().then(() => showEpgForChannel(ch));
-  }
+async function loadEpgSource(url){
+  const key=epgSourceKey(url);
+  const cached=epgData[key];
+  if(cached&&cached.channels&&Date.now()-(cached._ts||0)<EPG_TTL)return cached.channels;
+  if(epgSourcePromises[key])return epgSourcePromises[key];
+  epgSourcePromises[key]=(async()=>{try{const xml=await fetchTextMaybeGzip(url);if(!xml||xml.length<100)return {};const channels=parseXmltv(xml);epgData[key]={_ts:Date.now(),url,channels};saveEpgCache();return channels;}catch(e){return {};}})();
+  return epgSourcePromises[key];
+}
+function parseXmltvDate(v){
+  const m=String(v||'').match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(?:\s*([+-])(\d{2})(\d{2}))?/);
+  if(!m)return new Date(v);
+  let t=Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6]);
+  if(m[7]){const off=(+m[8]*60 + +m[9])*60000;t += (m[7]==='+'?-off:off);}
+  return new Date(t);
+}
+function candidateEpgIds(ch){return Array.from(new Set([ch&&ch.tvgId,ch&&ch.name,normalizeEpgId(ch&&ch.tvgId),normalizeEpgId(ch&&ch.name)].filter(Boolean)));}
+function applyEpgPrograms(ch,programs){
+  if(!programs||!programs.length)return false;
+  const now=new Date();let nowTitle='',nextTitle='';
+  programs.slice().sort((a,b)=>parseXmltvDate(a.start)-parseXmltvDate(b.start)).some(p=>{const start=parseXmltvDate(p.start),stop=parseXmltvDate(p.stop);if(now>=start&&now<stop){nowTitle=p.title;return false;}if(start>now&&!nextTitle){nextTitle=p.title;return !!nowTitle;}return false;});
+  if(!nowTitle&&programs[0])nowTitle=programs[0].title;
+  if(nowTitle){ch._epgNow=nowTitle;if(nextTitle)ch._epgNext=nextTitle;if(currentChannel&&currentChannel.url===ch.url){const el=$('barEpg');if(el){el.style.display='block';el.textContent='📅 '+nowTitle+(nextTitle?' · ▶ '+nextTitle:'');}}return true;}
+  return false;
+}
+async function loadEpgForChannel(ch){
+  if(!ch)return;
+  const el=$('barEpg');if(el){el.style.display='none';el.textContent='';}
+  const ids=candidateEpgIds(ch),urls=epgUrlsForChannel(ch);
+  for(const key of Object.keys(epgData)){const channels=epgData[key]&&epgData[key].channels;if(!channels)continue;for(const id of ids){if(channels[id]&&applyEpgPrograms(ch,channels[id]))return;}}
+  for(const url of urls){const channels=await loadEpgSource(url);for(const id of ids){if(channels[id]&&applyEpgPrograms(ch,channels[id]))return;}}
 }
 
 loadEpgCache();
-if (Object.keys(epgData).length === 0) loadEpgGuide(); // preload EPG at boot if not cached
 
 // ====== BOOT ======
 loadStreamStatus();

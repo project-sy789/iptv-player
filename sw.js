@@ -1,6 +1,6 @@
-// 📺 IPTV Player — Service Worker v15
-// v15: v2.8.5 theater controls fit fix
-const CACHE = 'iptv-player-v15';
+// 📺 IPTV Player — Service Worker v16
+// v16: v2.8.6 multi-source EPG
+const CACHE = 'iptv-player-v16';
 const ASSETS = [
   '/iptv-player/',
   '/iptv-player/manifest.json',
